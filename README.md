@@ -15,6 +15,22 @@ diagnostic build is an optional troubleshooting variant.
 Other ARK API versions and models are actively rejected; the regional suffix
 and r206 revision are validation references, not values exposed by the guards.
 
+**Community feedback welcome:** if you try this plugin on another PSP-2000
+variant or ARK-4 revision, please [open an issue](https://github.com/scornface/psp-battery-level/issues)
+with your PSP model, Sony firmware version, full ARK-4 version, theme, and observed
+behavior—including correct operation, visual glitches, or failure to load.
+Other PSP models and ARK API versions are currently rejected by the compatibility
+guards; reports for those configurations are compatibility requests, not evidence
+of support. Do not bypass the guards.
+
+## Download
+
+**[Download the latest release ZIP](https://github.com/scornface/psp-battery-level/releases/latest/download/psp-battery-level.zip)**
+
+Contains the ready-to-install `battery_level.prx` (release, without logging),
+installation instructions and license notices. No local build environment is needed.
+Source archives are available on the [releases page](https://github.com/scornface/psp-battery-level/releases).
+
 ## Installation
 
 1. Obtain or build `battery_level.prx` and copy it to `ms0:/SEPLUGINS/`.
