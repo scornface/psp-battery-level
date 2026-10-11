@@ -1,0 +1,48 @@
+# RCOMage changes: upstream LGPL-2.1; included libLZR retains BenHur CC BY-SA 3.0.
+# Research-only: use the authenticated-resource wrapper, not arbitrary RCOs.
+--- a/src/rcoreader.c
++++ b/src/rcoreader.c
+@@ -13,6 +13,7 @@
+ #include "rcofile.h"
+ #include "rcomain.h"
+ #include "configscan.h"
++#include "../../pspdecrypt-1.0/libLZR.c"
+ 
+ #define MAX_LABEL_DATA 16777216	// 16MB of data; also used for event/text data
+ #define MAX_TREE_DATA 33554432	// 32MB of data
+@@ -242,9 +243,21 @@
+ 	break;
+ 
+       case RCO_DATA_COMPRESSION_RLZ:
+-	error
+-	    ("[header] This RCO uses RLZ compression which currently cannot be decompressed with rcomage.  (use Z33's Resurssiklunssi to decompress the RCO)");
+-	return NULL;
++	{
++	  void *readBuf = malloc (ci.lenPacked);
++	  void *readEnd = NULL;
++	  fileread (rcoH.fp, readBuf, ci.lenPacked);
++	  int uRet = LZRDecompress (rcoH.tables, ci.lenUnpacked, readBuf, &readEnd);
++	  if (uRet != ci.lenUnpacked ||
++	      (uint8_t *) readEnd - (uint8_t *) readBuf > ci.lenPacked) {
++	    error ("[entries] Unable to decompress RLZ tree entries!");
++	    free (readBuf);
++	    return NULL;
++	  }
++	  free (readBuf);
++	  rcoH.fSizeExpanded += ci.lenUnpacked - ALIGN_TO_4 (ci.lenPacked);
++	}
++	break;
+ 
+       default:			// this won't actually ever be executed due to
+ 	// the new compression checking code above...
+--- a/src/vsmx.c
++++ b/src/vsmx.c
+@@ -1401,7 +1401,7 @@
+ 	    prev = VsmxDecompileStackPop (&stack);
+ 	    if (j) {
+ 	      wchar_t tmp[MAX_TEXT_LEN];
+-	      swprintf (tmp, L" %ls,", prev->str);
++	      swprintf (tmp, 6, L" %ls,", prev->str);
+ 	      wcsprecat (item.str, tmp, MAX_TEXT_LEN);
+ 	      // SWPRINTF_ITEM (" %ls,%ls", prev->str, item.str);
+ 	    } else

@@ -1,0 +1,2 @@
+# Optional host disassembly dependency; never needed to build/install the PRX.
+capstone==5.0.6
