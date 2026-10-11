@@ -1,0 +1,9 @@
+.deps/
+data/
+build/
+__pycache__/
+*.py[cod]
+*.o
+*.elf
+*.prx
+src/exports.c
