@@ -4,6 +4,8 @@ A VSH plugin for ARK-4 that displays **0%–100% to the right of the battery ico
 using Sony's native XMB text renderer and style. Layout follows the measured
 text width; date/time content and charging animation remain Sony-managed.
 
+![PSP XMB showing the battery percentage](docs/screenshots/xmb.png)
+
 ## Compatibility
 
 Verified on **PSP-2004, Sony 6.61, ARK-4 4.20.69 r206, standard theme**.
