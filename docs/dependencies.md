@@ -27,6 +27,19 @@ Native SDK versions are not pinned: record the toolchain and compare hashes.
 Native checkout paths with spaces and CFLAGS/OBJS overrides are unsupported;
 use Docker for such checkouts. Source lookup never searches generated objects.
 
+## Release automation
+
+`.github/workflows/release.yml` runs host tests and the pinned Docker release
+build on GitHub Actions. A manual run uploads artifacts without publishing;
+pushing a `v*` tag publishes the PRX, `psp-battery-level.zip` and `SHA256SUMS`.
+Tags containing a hyphen are published as prereleases. GitHub also provides
+source archives for the tagged commit. No diagnostic build or local research
+inputs are packaged.
+
+Before publishing `v0.9`, run the workflow manually: its PRX must match the
+hardware-tested SHA-256. The same check gates the `v0.9` tag build. For subsequent
+versions, update the manual-run reference hash after hardware validation.
+
 ## Runtime
 
 The PRX uses ARK KUBridge/SystemCtrl, Sony power/USB services and guarded calls

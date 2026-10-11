@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Run host tests
+        run: sh tools/test.sh
+
+      - name: Build and verify release
+        run: |
+          sh tools/build.sh release
+          python3 tools/check_build.py build/release/battery_level.prx --mode release
+
+      - name: Verify first release against hardware-tested build
+        if: github.ref == 'refs/tags/v0.9' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo 'fdac3a2fdce4454b99a0802ddb0fc478ec4ec01098a4ef4c0b7a8a035f52e0c8  build/release/battery_level.prx' | sha256sum --check
+
+      - name: Package release
+        run: |
+          mkdir -p build/package build/dist
+          cp build/release/battery_level.prx README.md LICENSE THIRD_PARTY_NOTICES.md build/package/
+          (cd build/package && zip -X ../dist/psp-battery-level.zip battery_level.prx README.md LICENSE THIRD_PARTY_NOTICES.md)
+          cp build/release/battery_level.prx build/dist/
+          (cd build/dist && sha256sum battery_level.prx psp-battery-level.zip > SHA256SUMS)
+
+      - name: Upload verified assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-assets
+          path: build/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          prerelease=()
+          if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes \
+            "${prerelease[@]}" dist/battery_level.prx dist/psp-battery-level.zip dist/SHA256SUMS
