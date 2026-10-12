@@ -3,11 +3,12 @@
 import ctypes
 import struct
 import hashlib
-from decompress_rco_rlz import ROOT, load_lzr, authenticated_resource
+from decompress_rco_rlz import load_lzr, authenticated_resource
+from common import external_directory, run
 
 
 def main():
-    rco = authenticated_resource(ROOT / "data/ofw-661/F0/vsh/resource/system_plugin_fg.rco")
+    rco = authenticated_resource(external_directory("PSP_FIRMWARE_ROOT") / "F0/vsh/resource/system_plugin_fg.rco")
     source = ctypes.create_string_buffer(rco[0x6a8:0xe37] + bytes(64))
     output = ctypes.create_string_buffer(4304)
     end = ctypes.c_void_p()
@@ -39,4 +40,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run(main)

@@ -1,5 +1,6 @@
 """Explicit scope and filesystem boundaries for optional Sony 6.61 research."""
 import hashlib
+import os
 from pathlib import Path
 import sys
 import struct
@@ -46,11 +47,28 @@ def analysis_module(source, image):
     return Prx.open(source, image)
 
 
+def external_directory(variable):
+    """Resolve an explicit input directory; never infer a sibling lab layout."""
+    value = os.environ.get(variable)
+    if not value or not value.strip():
+        raise ValueError(f"Set {variable} to the external input directory (see docs/dependencies.md)")
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        raise ValueError(f"{variable} must be an absolute directory path")
+    path = path.resolve()
+    if not path.is_dir():
+        raise ValueError(f"{variable} directory does not exist: {path}")
+    if path == (ROOT / "build").resolve() or (ROOT / "build").resolve() in path.parents:
+        raise ValueError(f"{variable} must be outside the generated build directory")
+    return path
+
+
 def capstone_module():
-    sys.path.insert(0, str(ROOT / ".deps/capstone-py"))
+    directory = external_directory("PSP_CAPSTONE_ROOT")
+    sys.path.insert(0, str(directory))
     import capstone
-    if capstone.__version__ != "5.0.6" or not Path(capstone.__file__).resolve().is_relative_to(ROOT / ".deps/capstone-py"):
-        raise ValueError("Install the pinned local Capstone dependency")
+    if capstone.__version__ != "5.0.6" or not Path(capstone.__file__).resolve().is_relative_to(directory):
+        raise ValueError("Install Capstone 5.0.6 in PSP_CAPSTONE_ROOT; global packages are not accepted")
     return capstone
 
 

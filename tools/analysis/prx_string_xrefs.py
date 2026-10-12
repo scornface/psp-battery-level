@@ -7,16 +7,6 @@ import argparse
 import re
 from pathlib import Path
 from common import analysis_module, capstone_module, run
-capstone_module()
-
-from capstone import (  # noqa: E402
-    CS_ARCH_MIPS,
-    CS_MODE_LITTLE_ENDIAN,
-    CS_MODE_MIPS32,
-    CS_OP_IMM,
-    CS_OP_REG,
-    Cs,
-)
 
 
 def find_strings(image: bytes, pattern: re.Pattern[bytes]) -> dict[int, bytes]:
@@ -39,6 +29,10 @@ def main() -> None:
     parser.add_argument("--pattern", default="battery|clock|charge|topmenu_plugin")
     parser.add_argument("--context", type=int, default=8)
     args = parser.parse_args()
+    capstone = capstone_module()
+    Cs = capstone.Cs
+    CS_ARCH_MIPS, CS_MODE_MIPS32, CS_MODE_LITTLE_ENDIAN = capstone.CS_ARCH_MIPS, capstone.CS_MODE_MIPS32, capstone.CS_MODE_LITTLE_ENDIAN
+    CS_OP_IMM, CS_OP_REG = capstone.CS_OP_IMM, capstone.CS_OP_REG
 
     if not 0 <= args.context <= 32:
         parser.error("context must be between 0 and 32")

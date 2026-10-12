@@ -11,13 +11,11 @@ import subprocess
 import platform
 import tempfile
 from pathlib import Path
-from common import outputs, run
+from common import external_directory, outputs, run
 from prx_libraries import bounded_read
 
 
 ROOT = Path(__file__).resolve().parents[2]
-LZR_SOURCE = ROOT / ".deps/pspdecrypt-1.0/libLZR.c"
-LZR_HEADER = ROOT / ".deps/pspdecrypt-1.0/libLZR.h"
 RCO_SHA256 = "3da2042c7042faf1d810c970bdb500ce812ea31e548ee9d0d17e57483c1c71dd"
 LZR_HASHES = (
     "cf3e094784557f0a0f47ebd4522f29e61461757883236eb202395ef13582ae6e",
@@ -40,16 +38,19 @@ def authenticated_resource(source):
 
 
 def load_lzr() -> ctypes.CDLL:
-    outputs(LZR_SOURCE)
-    if not LZR_SOURCE.is_file() or not LZR_HEADER.is_file():
-        raise SystemExit("Local pspdecrypt libLZR sources are missing under .deps/.")
+    directory = external_directory("PSP_PSPDECRYPT_ROOT")
+    source = directory / "libLZR.c"
+    header = directory / "libLZR.h"
+    outputs(source)
+    if not source.is_file() or not header.is_file():
+        raise ValueError("PSP_PSPDECRYPT_ROOT must contain pspdecrypt 1.0 libLZR.c and libLZR.h")
     if platform.system() != "Darwin":
         raise ValueError("This verified LZR build recipe supports macOS only")
     # Verified sources and an isolated build product; no shared writable dylib
     # races. libLZR has no input bound, so callers MUST authenticate the complete
     # canonical resource before entering C. This is not a generic RCO decoder.
-    source_hash = sha256(LZR_SOURCE.read_bytes())
-    header_hash = sha256(LZR_HEADER.read_bytes())
+    source_hash = sha256(source.read_bytes())
+    header_hash = sha256(header.read_bytes())
     if (source_hash, header_hash) != LZR_HASHES:
         raise ValueError("Unexpected LZR source/header; use the documented pspdecrypt 1.0 input")
     directory = ROOT / "build/analysis"
@@ -64,7 +65,7 @@ def load_lzr() -> ctypes.CDLL:
             "-O2",
             "-o",
             str(library_path),
-            str(LZR_SOURCE),
+            str(source),
         ],
         check=True,
     )

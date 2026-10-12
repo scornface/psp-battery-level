@@ -22,6 +22,10 @@ configuration or runtime execution identity.
 
 ## Optional firmware analysis
 
+Configure external inputs through the `PSP_*_ROOT` variables in
+[`../docs/dependencies.md`](../docs/dependencies.md). No fixed repository-local
+input directories are required, and normal builds/tests need none of these variables.
+
 `analysis/` contains tools for extending the verified native interface:
 
 - `resolve_prx_rel2.py`: reconstruct the three authenticated 6.61 PRX images;

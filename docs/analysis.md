@@ -7,11 +7,12 @@ Always discover current module bases before using them.
 
 ## Inputs and resource layout
 
+Configure the external inputs as described in [dependencies.md](dependencies.md).
 Analysis used the standard non-Go Sony 6.61 updater (MD5
 `6be8878f475ac5b1a499b95ab2f7d301`) extracted locally with pspdecrypt 1.0:
 
 ```sh
-.deps/pspdecrypt-1.0/pspdecrypt -A -O data/ofw-661 data/661/EBOOT.PBP
+"$PSP_PSPDECRYPT_ROOT/pspdecrypt" -A -O "$PSP_FIRMWARE_ROOT" "$PSP_UPDATER"
 ```
 
 No flash0 modification was used. Firmware copies are local, not distributed.
@@ -118,11 +119,11 @@ remain essential. The observed 6.61 user devkit value is `0x06060010`.
 ## Reproduction and references
 
 ```sh
-python3 tools/analysis/resolve_prx_rel2.py data/ofw-661/F0/vsh/module/paf.prx build/analysis/paf.relocated.bin build/analysis/paf.relocations.tsv
-python3 tools/prx_libraries.py data/ofw-661/F0/vsh/module/paf.prx --relocated-image build/analysis/paf.relocated.bin
+python3 tools/analysis/resolve_prx_rel2.py "$PSP_FIRMWARE_ROOT/F0/vsh/module/paf.prx" build/analysis/paf.relocated.bin build/analysis/paf.relocations.tsv
+python3 tools/prx_libraries.py "$PSP_FIRMWARE_ROOT/F0/vsh/module/paf.prx" --relocated-image build/analysis/paf.relocated.bin
 python3 tools/analysis/inspect_paf.py --range 0x105aa0:0x105b80
-python3 tools/analysis/decompress_rco_rlz.py data/ofw-661/F0/vsh/resource/system_plugin_fg.rco build/analysis/system_plugin_fg_tables.bin
-python3 tools/analysis/dump_rco.py data/ofw-661/F0/vsh/resource/system_plugin_fg.rco build/analysis/system_plugin_fg.xml
+python3 tools/analysis/decompress_rco_rlz.py "$PSP_FIRMWARE_ROOT/F0/vsh/resource/system_plugin_fg.rco" build/analysis/system_plugin_fg_tables.bin
+python3 tools/analysis/dump_rco.py "$PSP_FIRMWARE_ROOT/F0/vsh/resource/system_plugin_fg.rco" build/analysis/system_plugin_fg.xml
 ```
 
 Repeat relocation for `vshmain`/`dialogmain` when inspecting their callsites.

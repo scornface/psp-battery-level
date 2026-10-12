@@ -3,8 +3,9 @@
 ## Repository map
 - `src/`: plugin C/Allegrex sources and SDK Makefile; keep generated files out.
 - `tests/`: host policy and maintenance tests; `tools/`: build/verification helpers.
-- `tools/analysis/`: optional firmware research. External inputs live in ignored
-  `.deps/` and `data/`; outputs belong in ignored `build/`.
+- `tools/analysis/`: optional firmware research. External inputs are configured
+  through the `PSP_*_ROOT` variables documented in `docs/dependencies.md`;
+  outputs belong in ignored `build/`. Never infer a sibling laboratory layout.
 - Read `docs/architecture.md` before changing runtime state, `docs/analysis.md`
   before changing native offsets, and `docs/dependencies.md` for setup.
 

@@ -87,8 +87,9 @@ python3 tools/clean.py            # remove plugin intermediates; keep PRX/ELF
 ```
 
 Source is in `src/`, host tests in `tests/`, maintained scripts in `tools/`, and
-optional firmware research in `tools/analysis/`. `.deps/`, `data/` and `build/`
-are local-only directories and are not part of the distributed plugin.
+optional firmware research in `tools/analysis/`. External research tools and
+firmware are configured separately; generated outputs go in `build/`.
+Neither research inputs nor generated analysis products are distributed with the plugin.
 
 - [Architecture and runtime contracts](docs/architecture.md)
 - [Native interface evidence and reproduction](docs/analysis.md)

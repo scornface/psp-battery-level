@@ -9,7 +9,7 @@ import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
-from common import ROOT, outputs
+from common import ROOT, external_directory, outputs
 
 ARCHIVES = {
     "pspdecrypt-1.0.tar.gz": {"736cfffcbc3858e6e294781f5a329bbe157b4023ff59afe1adfca4df39ffa58b"},
@@ -37,9 +37,10 @@ def main():
     if platform.system() != "Darwin":
         raise SystemExit("This recorded host recipe supports macOS")
     target = ROOT / "build/analysis/rcomage-tool"
+    archives = external_directory("PSP_ARCHIVES_ROOT")
     inputs = {}
     for name, hashes in ARCHIVES.items():
-        archive = ROOT / ".deps" / name
+        archive = archives / name
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         if digest not in hashes: raise SystemExit(f"Unexpected archive hash: {name}")
         inputs[name] = digest
@@ -50,7 +51,7 @@ def main():
         work = Path(tmp)
         for name in ARCHIVES:
             directory = work / ("pspdecrypt-1.0" if name.startswith("pspdecrypt") else "RCOMage-master")
-            extract(ROOT / ".deps" / name, directory)
+            extract(archives / name, directory)
         source = work / "RCOMage-master"
         subprocess.run(["patch", "--batch", "-p1", "-i", str(patch)], cwd=source, check=True)
         sdk = subprocess.check_output(["xcrun", "--show-sdk-path"], text=True).strip()

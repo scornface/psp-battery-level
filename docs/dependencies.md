@@ -48,28 +48,51 @@ runtime dependencies. No external font or Sony firmware is bundled.
 
 ## Optional firmware research
 
-| Component | Local location / purpose |
-| --- | --- |
-| Capstone 5.0.6 | `.deps/capstone-py/`, MIPS disassembly |
-| pspdecrypt 1.0 | `.deps/pspdecrypt-1.0/`, OFW extraction and LZR source |
-| RCOMage 1.1.1 | Authenticated archive in `.deps/`; recorded product in `build/analysis/rcomage-tool/` |
+These inputs are not required for plugin builds or host tests. They can be stored
+anywhere, including a shared laboratory outside the repository. Scripts do not
+infer paths from the repository name, its parent directory or a user's home.
 
-Normal plugin builds never download these. Install Capstone explicitly:
+| Component | Required identity / purpose |
+| --- | --- |
+| Capstone | 5.0.6, MIPS disassembly |
+| pspdecrypt | 1.0, OFW extraction and authenticated LZR sources |
+| RCOMage | Recorded 1.1.1 source archive, reconstructed with the repository patch |
+| Sony firmware | Standard non-Go 6.61 updater and its extracted firmware |
+
+### Configure external inputs
+
+Set the following environment variables to absolute directories before using
+the relevant analysis tool. No variable is required by normal builds or tests.
+
+| Variable | Directory contents | Consumers |
+| --- | --- | --- |
+| `PSP_CAPSTONE_ROOT` | Pinned Python package installation containing `capstone/` | Disassembly tools |
+| `PSP_PSPDECRYPT_ROOT` | pspdecrypt 1.0 sources, including `libLZR.c/.h` | Native RCO decoding |
+| `PSP_ARCHIVES_ROOT` | Authenticated archives named below | RCOMage reconstruction |
+| `PSP_FIRMWARE_ROOT` | Extracted firmware root containing `F0/` | Native module/resource inspectors |
+
+Choose and create these directories yourself, then export their paths in your
+shell or a private environment file. Paths beneath generated `build/` are rejected.
+Tools that take an explicit input argument continue to accept that argument.
+In the commands below, `PSP_UPDATER` additionally denotes the absolute path to
+your locally obtained updater EBOOT.PBP; it is a shell convenience, not a script setting.
+
+Install Capstone into the configured package directory:
 
 ```sh
-mkdir -p .deps
-python3 -m pip install --target .deps/capstone-py -r tools/analysis/requirements.txt
+python3 -m pip install --target "$PSP_CAPSTONE_ROOT" -r tools/analysis/requirements.txt
 ```
 
-Analysis scripts require that local package/version; they do not silently use a
-different global installation. An upgrade needs verification of the known images.
+Analysis requires that package location and version, not a global installation.
+An upgrade needs independent verification of the known images. Shared installs
+should be versioned and treated as read-only inputs, not upgraded in place.
 
 ### Reconstruct the research inputs
 
 ```sh
-curl -fL https://codeload.github.com/John-K/pspdecrypt/tar.gz/refs/tags/1.0 -o .deps/pspdecrypt-1.0.tar.gz
-curl -fL https://codeload.github.com/kakaroto/RCOMage/tar.gz/54ca649a9a6aba150a1fbe423f4c3aec611ee913 -o .deps/RCOMage-master.tar.gz
-shasum -a 256 .deps/pspdecrypt-1.0.tar.gz .deps/RCOMage-master.tar.gz
+curl -fL https://codeload.github.com/John-K/pspdecrypt/tar.gz/refs/tags/1.0 -o "$PSP_ARCHIVES_ROOT/pspdecrypt-1.0.tar.gz"
+curl -fL https://codeload.github.com/kakaroto/RCOMage/tar.gz/54ca649a9a6aba150a1fbe423f4c3aec611ee913 -o "$PSP_ARCHIVES_ROOT/RCOMage-master.tar.gz"
+shasum -a 256 "$PSP_ARCHIVES_ROOT/pspdecrypt-1.0.tar.gz" "$PSP_ARCHIVES_ROOT/RCOMage-master.tar.gz"
 ```
 
 Expected SHA-256: pspdecrypt
@@ -79,8 +102,9 @@ The recorded older RCOMage archive
 `6b15161f8099cfe21f63ca56b42442a5cfea1f4183a0d56f176bdd1b6b295f79`
 is also accepted. Do not extract an archive until its hash matches.
 
-For OFW extraction, unpack pspdecrypt into `.deps/pspdecrypt-1.0` and run
-`make -C .deps/pspdecrypt-1.0`. Its Makefile needs Clang/C++, zlib and OpenSSL
+For OFW extraction, unpack the authenticated pspdecrypt archive into
+`PSP_PSPDECRYPT_ROOT` (with its source files directly in that directory), then run
+`make -C "$PSP_PSPDECRYPT_ROOT"`. Its Makefile needs Clang/C++, zlib and OpenSSL
 (`libcrypto`). Set local OpenSSL include/library search paths as needed: on
 Homebrew, `CPATH` and `LIBRARY_PATH` can point to the installation's `include`
 and `lib` directories. No global install of pspdecrypt is required.
@@ -105,18 +129,21 @@ Consumers require the generated `.bin.json` source/image hash manifest. Analysis
 outputs must be new paths in `build/analysis/`; remove only known generated
 outputs before repeating a command. Evidence and firmware are never output paths.
 
-## Directory boundaries and licenses
+## Ownership, boundaries and licenses
 
-- `tools/`: maintained project scripts; `tools/analysis/`: optional research.
-- `.deps/`: external archives, pspdecrypt sources and pinned Capstone package.
-- `data/661/`: locally obtained standard (non-Go) Sony 6.61 updater.
-- `data/ofw-661/`: extracted firmware; never shipped with the plugin.
-- `data/evidence/`: optional local research data; never publish raw device logs,
-  memory addresses, configuration, firmware dumps, or private material.
-- `build/`: generated plugin, host-test and analysis outputs; safe to regenerate.
+- The repository owns requirements, expected hashes, patches, recipes and tests.
+- A shared laboratory may own versioned archives, installed tools and firmware.
+  Its inventory records what is available; it does not override project requirements.
+- Hardware evidence is project-specific, not a dependency. Keep it separate;
+  never publish raw device logs, memory addresses, configuration, firmware dumps
+  or private material.
+- `build/` contains generated plugin, host-test and analysis outputs. Patched
+  RCOMage and temporary LZR libraries remain project-local build products.
 
-`.deps/`, `data/` and `build/` are ignored and must not be included in source or
-binary releases. Third-party components retain their licenses: pspdecrypt GPLv3,
+External research inputs and generated outputs must not be included in source or
+binary releases. Legacy ignored input directories remain excluded as a safeguard
+for existing checkouts, but are no longer required by the tools.
+Third-party components retain their licenses: pspdecrypt GPLv3,
 libLZR 0.11 by BenHur **CC BY-SA 3.0**, RCOMage
 LGPL-2.1 notices and Capstone's component notices. MIT does not relicense them.
 See [third-party notices](../THIRD_PARTY_NOTICES.md), including PSPSDK notices

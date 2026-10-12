@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """Inspect selected RVA ranges and direct callers in the local relocated PAF."""
 import argparse
-from common import ROOT, analysis_module, capstone_module, run
-capstone = capstone_module()
-Cs = capstone.Cs
-CS_ARCH_MIPS, CS_MODE_MIPS32, CS_MODE_LITTLE_ENDIAN = capstone.CS_ARCH_MIPS, capstone.CS_MODE_MIPS32, capstone.CS_MODE_LITTLE_ENDIAN
+from common import ROOT, analysis_module, capstone_module, external_directory, run
 
 
 def main():
@@ -17,7 +14,10 @@ def main():
                         help="Find memory accesses to an offset in node/event code")
     parser.add_argument("--word", action="append", default=[], type=lambda s: int(s, 0))
     args = parser.parse_args()
-    module = analysis_module(ROOT / f"data/ofw-661/F0/vsh/module/{args.module}.prx",
+    capstone = capstone_module()
+    Cs = capstone.Cs
+    CS_ARCH_MIPS, CS_MODE_MIPS32, CS_MODE_LITTLE_ENDIAN = capstone.CS_ARCH_MIPS, capstone.CS_MODE_MIPS32, capstone.CS_MODE_LITTLE_ENDIAN
+    module = analysis_module(external_directory("PSP_FIRMWARE_ROOT") / f"F0/vsh/module/{args.module}.prx",
                              ROOT / f"build/analysis/{args.module}.relocated.bin")
     image = module.image
     for address in args.word:
