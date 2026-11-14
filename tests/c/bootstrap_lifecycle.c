@@ -41,15 +41,19 @@ unsigned sctrlHENGetMinorVersion(void)
     return 69;
 }
 
-int sceKernelCreateThread(const char *name,
-                          int (*f)(SceSize, void *),
-                          int priority,
-                          int stack,
-                          unsigned attr,
-                          void *option)
+int sceKernelCreateThread(
+    const char *name,
+    int (*f)(SceSize, void *),
+    int priority,
+    int stack,
+    unsigned attr,
+    void *option
+)
 {
-    assert(!strcmp(name, "battery_bootstrap") && priority == 0x30 && stack == 0x8000 && !attr &&
-           !option);
+    assert(
+        !strcmp(name, "battery_bootstrap") && priority == 0x30 && stack == 0x8000 && !attr &&
+        !option
+    );
     entry = f;
     return mode == 3 ? -1 : 42;
 }
@@ -57,8 +61,9 @@ int sceKernelCreateThread(const char *name,
 int sceKernelStartThread(int id, unsigned n, void *p)
 {
     assert(id == 42 && !n && !p);
-    if (mode == 4)
+    if (mode == 4) {
         return -1;
+    }
     if (mode != 5) {
         ran = 1;
         entry(0, 0);
@@ -155,13 +160,16 @@ int main(int argc, char **argv)
     }
     assert(module_stop(0, 0) == (mode == 6 || mode == 7 ? -1 : 0));
     assert(!home_started);
-    if (mode == 2 || mode == 5)
+    if (mode == 2 || mode == 5) {
         assert(!vsh_started);
-    else
+    } else {
         assert(vsh_started == 1);
-    if (mode == 6)
+    }
+    if (mode == 6) {
         assert(!vsh_stopped && !deleted);
-    if (mode == 7)
+    }
+    if (mode == 7) {
         assert(vsh_stopped == 1 && !deleted);
+    }
     return 0;
 }

@@ -23,8 +23,9 @@ static int named(const ModuleDescriptor *m, const char *name)
 {
     const char *actual = (const char *)m + 8;
     unsigned i = 0;
-    while (i < 27 && name[i] && actual[i] == name[i])
+    while (i < 27 && name[i] && actual[i] == name[i]) {
         ++i;
+    }
     return i < 27 && !name[i] && !actual[i];
 }
 
@@ -32,13 +33,15 @@ static int named(const ModuleDescriptor *m, const char *name)
 static int mapped(const ModuleDescriptor *m, unsigned address, unsigned bytes)
 {
     unsigned count = m->words[0x7c / 4];
-    if (!count || count > 4)
+    if (!count || count > 4) {
         return 0;
+    }
     for (unsigned i = 0; i < count; ++i) {
         unsigned base = m->words[0x80 / 4 + i], size = m->words[0x90 / 4 + i];
         if (user_address(base, size) && address >= base && bytes <= size &&
-            address - base <= size - bytes)
+            address - base <= size - bytes) {
             return 1;
+        }
     }
     return 0;
 }
@@ -53,8 +56,9 @@ int native_discover(NativeDiscovery *info)
         info->paf_query = pq;
         info->vsh_query = vq;
     }
-    if (pq < 0 || vq < 0)
+    if (pq < 0 || vq < 0) {
         return -1;
+    }
     unsigned pb = p.words[0x6c / 4], vb = v.words[0x6c / 4];
     unsigned ps = p.words[0x70 / 4], vs = v.words[0x70 / 4];
     unsigned checks = (named(&p, "scePaf_Module") && named(&v, "vsh_module") ? 1 : 0) |
@@ -69,8 +73,9 @@ int native_discover(NativeDiscovery *info)
         info->vsh_base = vb;
         info->checks = checks;
     }
-    if (checks != 63)
+    if (checks != 63) {
         return -2;
+    }
     paf = pb;
     vsh = vb;
     return 0;
@@ -124,8 +129,9 @@ int style(U n)
     result |= real(n, 0x1c, 7.6f);
     result |= record(n, 0x26, 1, 1, 1, 1);
     result |= record(n, 0x27, 1, 1, 1, 1);
-    for (unsigned id = 0x1d; id <= 0x21; ++id)
+    for (unsigned id = 0x1d; id <= 0x21; ++id) {
         result |= real(n, id, 0);
+    }
     result |= scalar(n, 0x6c, 0x22, 0);
     result |= scalar(n, 0x70, 0x23, 0);
     result |= scalar(n, 0x6c, 0x24, 1);
@@ -146,14 +152,17 @@ void destroy_text(U n)
  */
 unsigned occurrences(U parent, unsigned offset, U needle)
 {
-    if (offset > 0x560 - 12 || !user_address(parent, 0x560))
+    if (offset > 0x560 - 12 || !user_address(parent, 0x560)) {
         return ~0u;
+    }
     unsigned count = word(parent + offset + 4), capacity = word(parent + offset + 8), found = 0;
     U data = word(parent + offset);
-    if (count > capacity || count > 64 || (count && !user_address(data, count * 4)))
+    if (count > capacity || count > 64 || (count && !user_address(data, count * 4))) {
         return ~0u;
-    for (unsigned i = 0; i < count; ++i)
+    }
+    for (unsigned i = 0; i < count; ++i) {
         found += word(data + i * 4) == needle;
+    }
     return found;
 }
 

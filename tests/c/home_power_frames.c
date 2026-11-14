@@ -17,8 +17,9 @@ int main(void)
         assert(home_power_stage(&state, &tiles, 1, (int)value, &update) == 0);
         assert(state.front == front && state.valid == valid);
         assert(memcmp(&before, &state.frames[front], sizeof(before)) == 0);
-        if (valid)
+        if (valid) {
             assert(home_power_front(&state)->percent == value - 1);
+        }
         assert(update.slot == (front ^ 1u) && update.valid == 1);
         assert(home_power_commit(&state, &update) == 0);
         assert(home_power_front(&state)->percent == value && state.generation == value + 1);

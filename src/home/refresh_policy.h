@@ -12,21 +12,25 @@ typedef struct {
  * rejected invocation cannot finish or steal the outer invocation's grant. */
 static inline unsigned home_refresh_begin(HomeRefreshState *state)
 {
-    if (state->busy)
+    if (state->busy) {
         return 0;
+    }
     unsigned token = ++state->serial;
-    if (!token)
+    if (!token) {
         token = ++state->serial;
+    }
     state->busy = token;
     return token;
 }
 
 static inline int home_refresh_finish(HomeRefreshState *state, unsigned token)
 {
-    if (!token)
+    if (!token) {
         return 0;
-    if (state->busy != token)
+    }
+    if (state->busy != token) {
         return -1;
+    }
     state->busy = 0;
     return 1;
 }

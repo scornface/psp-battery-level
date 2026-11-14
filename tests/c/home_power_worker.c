@@ -57,8 +57,9 @@ int main(void)
     assert(home_power_poll(&state, &tiles, &sample) == 0 && !home_power_front(&state));
     exists = 1;
     charge = 42;
-    assert(home_power_poll(&state, &tiles, &sample) == 0 &&
-           home_power_front(&state)->percent == 42);
+    assert(
+        home_power_poll(&state, &tiles, &sample) == 0 && home_power_front(&state)->percent == 42
+    );
     tiles.ready = 0;
     assert(home_power_poll(&state, &tiles, &sample) == -2 && !home_power_front(&state));
     assert(!held);

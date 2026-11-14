@@ -4,19 +4,19 @@
 #define BATTERY_XMB_H
 
 #ifndef BATTERY_DIAGNOSTICS
-#define BATTERY_DIAGNOSTICS 0
+    #define BATTERY_DIAGNOSTICS 0
 #endif
 #if BATTERY_DIAGNOSTICS
-#define DIAG(...)                                                                                  \
-    do {                                                                                           \
-        __VA_ARGS__;                                                                               \
-    } while (0)
-#define BUILD_ID_TOKEN 0001000b
+    #define DIAG(...)                                                                              \
+        do {                                                                                       \
+            __VA_ARGS__;                                                                           \
+        } while (0)
+    #define BUILD_ID_TOKEN 0001000b
 #else
-#define DIAG(...)                                                                                  \
-    do {                                                                                           \
-    } while (0)
-#define BUILD_ID_TOKEN 0001000a
+    #define DIAG(...)                                                                              \
+        do {                                                                                       \
+        } while (0)
+    #define BUILD_ID_TOKEN 0001000a
 #endif
 #define BUILD_NUMBER_(token) 0x##token##u
 #define BUILD_NUMBER(token) BUILD_NUMBER_(token)

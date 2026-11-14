@@ -25,9 +25,9 @@ typedef struct {
     unsigned fault_site;
 } HomeBarSession;
 
-HOME_INLINE unsigned home_bar_profile(const HomeNativeState *live,
-                                      const HomeBinding *binding,
-                                      const HomeSprite *shape)
+HOME_INLINE unsigned home_bar_profile(
+    const HomeNativeState *live, const HomeBinding *binding, const HomeSprite *shape
+)
 {
     HomeNativeState local = *live;
     local.b8 |= 1u; /* Permit Sony's already-pending full update, no live store. */
@@ -44,8 +44,9 @@ HOME_INLINE void home_bar_retire(HomeBarSession *bar)
         ++bar->retired;
         bar->wait_full = 1;
     }
-    if (!bar->presented)
+    if (!bar->presented) {
         bar->canonical_valid = 0;
+    }
 }
 
 HOME_INLINE unsigned home_bar_conflict(HomeBarSession *bar, unsigned site)
@@ -60,23 +61,27 @@ HOME_INLINE unsigned home_bar_conflict(HomeBarSession *bar, unsigned site)
  * Callers validate scene/binding first and decide whether suspension ends. */
 HOME_INLINE unsigned home_bar_restore(HomeBarSession *bar, volatile uint16_t *native)
 {
-    if (home_bar_restore32(native, 512u * 272u, bar->presentation, bar->canonical))
+    if (home_bar_restore32(native, 512u * 272u, bar->presentation, bar->canonical)) {
         return home_bar_conflict(bar, 2);
+    }
     ++bar->restores;
     return 0;
 }
 
-HOME_INLINE unsigned home_bar_before(HomeBarSession *bar,
-                                     const HomeNativeState *live,
-                                     const HomeBinding *binding,
-                                     const HomeSprite *shape,
-                                     const HomeSprite *frame,
-                                     volatile uint16_t *native)
+HOME_INLINE unsigned home_bar_before(
+    HomeBarSession *bar,
+    const HomeNativeState *live,
+    const HomeBinding *binding,
+    const HomeSprite *shape,
+    const HomeSprite *frame,
+    volatile uint16_t *native
+)
 {
     bar->action = HOME_BAR_IDLE;
     unsigned reason = home_bar_bound(live, binding);
-    if (reason)
+    if (reason) {
         return reason;
+    }
 
     unsigned profile = home_bar_profile(live, binding, shape);
     if (profile) {
@@ -85,8 +90,9 @@ HOME_INLINE unsigned home_bar_before(HomeBarSession *bar,
          * invocation necessarily took +6a7c: exact normal a4, bit 0 clear.
          */
         home_bar_retire(bar);
-        if (live->a4 == 0x50102u && !(live->b8 & 1u))
+        if (live->a4 == 0x50102u && !(live->b8 & 1u)) {
             bar->action = HOME_BAR_CAPTURE;
+        }
         return profile;
     }
 
@@ -95,15 +101,18 @@ HOME_INLINE unsigned home_bar_before(HomeBarSession *bar,
      * BEFORE the wait gate and before Sony can perform a partial battery copy.
      * The entire strip must still match, with the same measured boundary. */
     if (bar->wait_full && bar->presented && !full) {
-        if (!bar->canonical_valid || live->left != bar->left)
+        if (!bar->canonical_valid || live->left != bar->left) {
             return home_bar_conflict(bar, 1);
+        }
         unsigned restored = home_bar_restore(bar, native);
-        if (restored)
+        if (restored) {
             return restored;
+        }
         bar->presented = bar->wait_full = 0;
     }
-    if (bar->wait_full && !full)
+    if (bar->wait_full && !full) {
         return 11;
+    }
     if (full) {
         /* +5d0(1) clears the ENTIRE owned strip before native recomposition.
          * A stale previous presentation must not be restored over that work.
@@ -111,30 +120,35 @@ HOME_INLINE unsigned home_bar_before(HomeBarSession *bar,
         bar->action = HOME_BAR_CAPTURE;
         return 0;
     }
-    if (bar->presented && live->left != bar->left)
+    if (bar->presented && live->left != bar->left) {
         return home_bar_conflict(bar, 1);
+    }
 
     unsigned battery_dirty = !(live->b8 & 0x80u);
     if (bar->presented && (battery_dirty || !frame)) {
         unsigned restored = home_bar_restore(bar, native);
-        if (restored)
+        if (restored) {
             return restored;
+        }
         bar->presented = 0;
     }
-    if (battery_dirty || !bar->canonical_valid)
+    if (battery_dirty || !bar->canonical_valid) {
         bar->action = HOME_BAR_CAPTURE;
-    else if (frame &&
-             (!bar->presented || frame->percent != bar->percent || frame->width != bar->width))
+    } else if (frame &&
+               (!bar->presented || frame->percent != bar->percent || frame->width != bar->width)) {
         bar->action = HOME_BAR_REPLACE;
+    }
     return 0;
 }
 
-HOME_INLINE unsigned home_bar_after(HomeBarSession *bar,
-                                    const HomeNativeState *live,
-                                    const HomeBinding *binding,
-                                    const HomeSprite *shape,
-                                    const HomeSprite *frame,
-                                    volatile uint16_t *native)
+HOME_INLINE unsigned home_bar_after(
+    HomeBarSession *bar,
+    const HomeNativeState *live,
+    const HomeBinding *binding,
+    const HomeSprite *shape,
+    const HomeSprite *frame,
+    volatile uint16_t *native
+)
 {
     unsigned action = bar->action;
     bar->action = HOME_BAR_IDLE;
@@ -155,8 +169,9 @@ HOME_INLINE unsigned home_bar_after(HomeBarSession *bar,
 
     unsigned reason = home_bar_profile(live, binding, shape);
     /* Do not capture a pending refresh or broaden the post-state flag set. */
-    if (!reason && !(live->b8 & 1u))
+    if (!reason && !(live->b8 & 1u)) {
         reason = 4;
+    }
     if (reason) {
         home_bar_retire(bar);
         /* A completed full clear already discharged ownership above, even if
@@ -165,11 +180,13 @@ HOME_INLINE unsigned home_bar_after(HomeBarSession *bar,
         return reason;
     }
 
-    if (action == HOME_BAR_IDLE)
+    if (action == HOME_BAR_IDLE) {
         return 0; /* ZERO strip accesses on clean frames. */
+    }
     if (action == HOME_BAR_CAPTURE) {
-        if (home_bar_capture32(native, 512u * 272u, bar->canonical, HOME_BAR_PIXELS))
+        if (home_bar_capture32(native, 512u * 272u, bar->canonical, HOME_BAR_PIXELS)) {
             return home_bar_conflict(bar, 6);
+        }
         bar->canonical_valid = 1;
         bar->wait_full = 0;
         bar->presented = 0;
@@ -179,19 +196,25 @@ HOME_INLINE unsigned home_bar_after(HomeBarSession *bar,
         /* Power-only replacement must retain canonical pixels, not restore them
          * on screen. Validate ALL old output before generating/writing new output.
          */
-        if (home_bar_match32(native, 512u * 272u, bar->presentation, HOME_BAR_PIXELS))
+        if (home_bar_match32(native, 512u * 272u, bar->presentation, HOME_BAR_PIXELS)) {
             return home_bar_conflict(bar, 3);
+        }
     }
-    if (!frame)
+    if (!frame) {
         return 9;
-    if (!bar->canonical_valid || (action != HOME_BAR_CAPTURE && live->left != bar->left))
+    }
+    if (!bar->canonical_valid || (action != HOME_BAR_CAPTURE && live->left != bar->left)) {
         return home_bar_conflict(bar, 4);
+    }
 
     if (home_bar_compose(
-            bar->canonical, HOME_BAR_PIXELS, live->left, frame, bar->presentation, HOME_BAR_PIXELS))
+            bar->canonical, HOME_BAR_PIXELS, live->left, frame, bar->presentation, HOME_BAR_PIXELS
+        )) {
         return home_bar_conflict(bar, 5);
-    if (home_bar_present32(native, 512u * 272u, bar->presentation, HOME_BAR_PIXELS))
+    }
+    if (home_bar_present32(native, 512u * 272u, bar->presentation, HOME_BAR_PIXELS)) {
         return home_bar_conflict(bar, 6);
+    }
     bar->presented = 1;
     bar->percent = frame->percent;
     bar->left = live->left;

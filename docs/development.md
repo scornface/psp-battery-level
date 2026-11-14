@@ -71,7 +71,7 @@ python3 tools/format.py --write
 
 The default is check-only. The runner requires the pinned versions and runs formatters only, not lint fixes. CI uses the same check. Normal host tests do not require formatters.
 
-- C/headers in `src/` and `tests/`: clang-format 21.1.8, four spaces, approximately 100 columns, function braces on the next line and no compressed function/condition/loop bodies. Include order and existing braces are preserved. `DIAG` statement arguments retain their manual line breaks.
+- C/headers in `src/` and `tests/`: clang-format 21.1.8, four spaces, approximately 100 columns, block-style multiline arguments and initializers, function braces on the next line and explicit control-statement braces. Continuation indentation is four spaces; long initializer lists remain packed. Labels remain at column zero, and nested preprocessor directives use four-space indentation. Include order is preserved. `DIAG` statement arguments retain their manual line breaks; macro and preprocessor boundaries require manual review because automatic brace insertion can skip them.
 - Python in `tests/` and `tools/`: Ruff 0.14.5, four spaces and 100 columns. No import sorting or automatic lint corrections.
 - Markdown: no column limit. Keep each prose paragraph on one line; use line breaks for Markdown structure, not text wrapping. Preserve quoted license text.
 - Assembly, Makefiles, PSP exports, third-party patches, archives and generated files are outside automatic formatting.

@@ -4,6 +4,6 @@
 #if BATTERY_DIAGNOSTICS
 void battery_boot_log(unsigned context, int outcome, int terminal);
 #else
-#define battery_boot_log(context, outcome, terminal) ((void)0)
+    #define battery_boot_log(context, outcome, terminal) ((void)0)
 #endif
 #endif

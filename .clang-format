@@ -21,10 +21,15 @@ AllowShortEnumsOnASingleLine: false
 SeparateDefinitionBlocks: Always
 SortIncludes: Never
 IncludeBlocks: Preserve
-InsertBraces: false
+InsertBraces: true
+IndentGotoLabels: false
+IndentPPDirectives: BeforeHash
+PPIndentWidth: 4
 RemoveBracesLLVM: false
 ReflowComments: Never
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: BlockIndent
+BracedInitializerIndentWidth: 4
+BinPackLongBracedList: true
 BinPackArguments: false
 BinPackParameters: false
 PenaltyReturnTypeOnItsOwnLine: 1000000

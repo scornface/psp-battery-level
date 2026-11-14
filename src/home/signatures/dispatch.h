@@ -40,11 +40,14 @@ static const Signature signatures[] = {
 
 static unsigned signature_word(const Signature *s, unsigned base)
 {
-    if (s->kind == 1)
+    if (s->kind == 1) {
         return (s->word & 0xffff0000) | ((s->word + base) & 0xffff);
-    if (s->kind == 2)
+    }
+    if (s->kind == 2) {
         return (s->word & 0xffff0000) | (((base + s->target + 0x8000) >> 16) & 0xffff);
-    if (s->kind == 3)
+    }
+    if (s->kind == 3) {
         return (s->word & 0xfc000000) | (((s->word & 0x03ffffff) + (base >> 2)) & 0x03ffffff);
+    }
     return s->word;
 }

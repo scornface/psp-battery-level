@@ -25,15 +25,18 @@ typedef struct {
  * C calls alone do not establish a PSP publication/interrupt contract.
  */
 static inline int home_power_stage(
-    HomePowerFrames *state, const HomeTiles *tiles, int exists, int percent, HomePowerUpdate *out)
+    HomePowerFrames *state, const HomeTiles *tiles, int exists, int percent, HomePowerUpdate *out
+)
 {
-    if (!state || !out || state->front > 1)
+    if (!state || !out || state->front > 1) {
         return -1;
+    }
     HomePowerUpdate update = {state->front, 0, percent};
     if (exists == 1 && percent >= 0 && percent <= 100) {
         update.slot = state->front ^ 1u;
-        if (home_sprite_compose(tiles, (unsigned)percent, &state->frames[update.slot]))
+        if (home_sprite_compose(tiles, (unsigned)percent, &state->frames[update.slot])) {
             return -2;
+        }
         update.valid = 1;
     }
     *out = update;
@@ -42,14 +45,17 @@ static inline int home_power_stage(
 
 static inline int home_power_commit(HomePowerFrames *state, const HomePowerUpdate *update)
 {
-    if (!state || !update || state->front > 1 || update->slot > 1 || update->valid > 1)
+    if (!state || !update || state->front > 1 || update->slot > 1 || update->valid > 1) {
         return -1;
+    }
     if (update->valid &&
         (update->slot == state->front || update->sampled < 0 || update->sampled > 100 ||
-         state->frames[update->slot].percent != (unsigned)update->sampled))
+         state->frames[update->slot].percent != (unsigned)update->sampled)) {
         return -1;
-    if (update->valid)
+    }
+    if (update->valid) {
         state->front = update->slot;
+    }
     state->valid = update->valid;
     ++state->generation;
     return 0;

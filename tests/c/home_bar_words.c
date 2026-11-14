@@ -23,22 +23,30 @@ int main(void)
 {
     uint16_t *native = frame + 2, *out = shown + 2, *canonical = original + 2;
     for (unsigned iteration = 0; iteration < 256; ++iteration) {
-        for (unsigned i = 0; i < FRAME + 4; ++i)
+        for (unsigned i = 0; i < FRAME + 4; ++i) {
             frame[i] = random_word();
+        }
         shown[0] = shown[1] = shown[HOME_BAR_PIXELS + 2] = shown[HOME_BAR_PIXELS + 3] = 0x1234;
         assert(home_bar_capture32(native, FRAME, out, HOME_BAR_PIXELS) == 0);
-        for (unsigned y = 0; y < 17; ++y)
-            for (unsigned x = 0; x < 228; ++x)
+        for (unsigned y = 0; y < 17; ++y) {
+            for (unsigned x = 0; x < 228; ++x) {
                 assert(out[y * 228 + x] == native[(y + 5) * 512 + 250 + x]);
-        assert(shown[0] == 0x1234 && shown[1] == 0x1234 && shown[HOME_BAR_PIXELS + 2] == 0x1234 &&
-               shown[HOME_BAR_PIXELS + 3] == 0x1234);
+            }
+        }
+        assert(
+            shown[0] == 0x1234 && shown[1] == 0x1234 && shown[HOME_BAR_PIXELS + 2] == 0x1234 &&
+            shown[HOME_BAR_PIXELS + 3] == 0x1234
+        );
         assert(home_bar_match32(native, FRAME, out, HOME_BAR_PIXELS) == 0);
-        for (unsigned i = 0; i < HOME_BAR_PIXELS; ++i)
+        for (unsigned i = 0; i < HOME_BAR_PIXELS; ++i) {
             canonical[i] = random_word();
+        }
         memcpy(expected, frame, sizeof(frame));
-        for (unsigned y = 0; y < 17; ++y)
-            for (unsigned x = 0; x < 228; ++x)
+        for (unsigned y = 0; y < 17; ++y) {
+            for (unsigned x = 0; x < 228; ++x) {
                 expected[2 + (y + 5) * 512 + 250 + x] = canonical[y * 228 + x];
+            }
+        }
         assert(home_bar_restore32(native, FRAME, out, canonical) == 0);
         assert(!memcmp(expected, frame, sizeof(frame)));
         assert(home_bar_capture32(native, FRAME, out, HOME_BAR_PIXELS) == 0);

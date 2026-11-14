@@ -19,8 +19,9 @@ static inline void publication_barrier(void)
 
 int home_power_poll(HomePowerFrames *state, const HomeTiles *tiles, HomePowerSample *sample)
 {
-    if (!state || !tiles || !sample)
+    if (!state || !tiles || !sample) {
         return -1;
+    }
     HomePowerSample result;
     result.exists = scePowerIsBatteryExist();
     result.percent = result.exists == 1 ? scePowerGetBatteryLifePercent() : -1;

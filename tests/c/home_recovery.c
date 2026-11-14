@@ -23,17 +23,21 @@ static unsigned after(const HomeSprite *f)
 
 static void sony_full(void)
 {
-    for (unsigned y = 0; y < 17; ++y)
-        for (unsigned x = 0; x < 228; ++x)
+    for (unsigned y = 0; y < 17; ++y) {
+        for (unsigned x = 0; x < 228; ++x) {
             native[(y + 5) * 512 + 250 + x] = x < 88 ? 0x9ce7 : (uint16_t)(0x8000 + y * 228 + x);
+        }
+    }
     s.b8 = 0x3bf;
 }
 
 static void matches(const uint16_t *pixels)
 {
-    for (unsigned y = 0; y < 17; ++y)
-        for (unsigned x = 0; x < 228; ++x)
+    for (unsigned y = 0; y < 17; ++y) {
+        for (unsigned x = 0; x < 228; ++x) {
             assert(native[(y + 5) * 512 + 250 + x] == pixels[y * 228 + x]);
+        }
+    }
 }
 
 static void start(void)
@@ -44,8 +48,9 @@ static void start(void)
     sprite.width = 36;
     sprite.height = 15;
     sprite.percent = 86;
-    for (unsigned i = 0; i < 960; ++i)
+    for (unsigned i = 0; i < 960; ++i) {
         sprite.pixels[i] = 0xffff;
+    }
 
     sony_full();
     assert(before(&sprite) == 0 && after(&sprite) == 0);
@@ -81,16 +86,20 @@ static void test_dirty_battery_recovery(void)
     assert(before(&sprite) == 0 && bar.restores == 1 && !bar.presented && !bar.wait_full);
     matches(bar.canonical);
 
-    for (unsigned y = 5; y < 22; ++y)
-        for (unsigned x = 450; x < 478; ++x)
+    for (unsigned y = 5; y < 22; ++y) {
+        for (unsigned x = 450; x < 478; ++x) {
             native[y * 512 + x] = 0xabcd;
+        }
+    }
     s.b8 = 0x3bf;
     assert(after(&sprite) == 0 && bar.presented && bar.captures == 2);
 
     unsigned battery_x = 450 - home_bar_shift(sprite.width);
-    for (unsigned y = 5; y < 22; ++y)
-        for (unsigned x = battery_x; x < battery_x + 28; ++x)
+    for (unsigned y = 5; y < 22; ++y) {
+        for (unsigned x = battery_x; x < battery_x + 28; ++x) {
             assert(native[y * 512 + x] == 0xabcd);
+        }
+    }
     matches(bar.presentation);
     assert(!bar.conflicts);
 }
@@ -166,14 +175,18 @@ static void test_conflicts_and_binding_changes(void)
         start();
         suspend();
         s.b8 = 0x33f;
-        if (mode == 0)
+        if (mode == 0) {
             native[21 * 512 + 477] ^= 1;
-        if (mode == 1)
+        }
+        if (mode == 1) {
             ++s.left;
-        if (mode == 2)
+        }
+        if (mode == 2) {
             s.draw += 64;
-        if (mode == 3)
+        }
+        if (mode == 3) {
             bar.canonical_valid = 0;
+        }
         memcpy(saved, native, sizeof(native));
         assert(before(&sprite) == (mode == 2 ? 2 : 8));
         assert(bar.presented && bar.wait_full);
@@ -205,24 +218,33 @@ static void test_rejected_scenes_never_access_pixels(void)
         start();
         suspend();
         s.b8 = 0x3bf;
-        if (guard == 0)
+        if (guard == 0) {
             s.a4 = 0x80050102u;
-        if (guard == 1)
+        }
+        if (guard == 1) {
             s.active = 0;
-        if (guard == 2)
+        }
+        if (guard == 2) {
             s.battery = 0;
-        if (guard == 3)
+        }
+        if (guard == 3) {
             s.offset_y = 1;
-        if (guard == 4)
+        }
+        if (guard == 4) {
             s.transition = 1;
-        if (guard == 5)
+        }
+        if (guard == 5) {
             s.format_state = 1;
-        if (guard == 6)
+        }
+        if (guard == 6) {
             s.bar_mode = 1;
-        if (guard == 7)
+        }
+        if (guard == 7) {
             s.resource_state = 0;
-        if (guard == 8)
+        }
+        if (guard == 8) {
             s.left = 250;
+        }
         assert(home_bar_before(&bar, &s, &binding, &sprite, &sprite, 0) != 0);
         assert(home_bar_after(&bar, &s, &binding, &sprite, &sprite, 0) != 0);
         assert(bar.presented && bar.wait_full && !bar.restores);

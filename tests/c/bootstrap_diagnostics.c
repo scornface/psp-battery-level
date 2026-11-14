@@ -30,8 +30,9 @@ int sceIoOpen(const char *path, int flags, int mode)
     assert(!active && !strcmp(path, "ms0:/SEPLUGINS/battery-level-runtime.log"));
     assert(flags == (2 | 0x100 | 0x200) && mode == 0777);
     ++opens;
-    if (fail_open)
+    if (fail_open) {
         return -1;
+    }
     used = 0;
     active = 1;
     return 42;
@@ -40,10 +41,12 @@ int sceIoOpen(const char *path, int flags, int mode)
 int sceIoWrite(int id, const void *data, unsigned n)
 {
     assert(active && id == 42 && n);
-    if (fail_write)
+    if (fail_write) {
         return -1;
-    if (n > 7)
+    }
+    if (n > 7) {
         n = 7;
+    }
     assert(used + n < sizeof(line));
     memcpy(line + used, data, n);
     used += n;
@@ -74,8 +77,10 @@ int main(void)
     fail_open = 0;
     battery_boot_log(2, 0, 0);
     assert(opens == 2 && closes == 1);
-    assert(strstr(line, "runtime build_id=00030004") && strstr(line, " start_us=") &&
-           strstr(line, " time_us=") && strstr(line, " end_runtime\n"));
+    assert(
+        strstr(line, "runtime build_id=00030004") && strstr(line, " start_us=") &&
+        strstr(line, " time_us=") && strstr(line, " end_runtime\n")
+    );
     battery_boot_log(2, 0, 0);
     assert(opens == 2); /* Time alone does not log. */
     status.drawn = 1;

@@ -24,12 +24,14 @@ unsigned word(U p)
 {
     assert(user_address(p, 4));
     ++reads;
-    for (unsigned i = 0; i < used; ++i)
+    for (unsigned i = 0; i < used; ++i) {
         if (memory[i].address == p) {
-            if (p == mutate_address && mutate_reads && !--mutate_reads)
+            if (p == mutate_address && mutate_reads && !--mutate_reads) {
                 memory[i].value = mutate_value;
+            }
             return memory[i].value;
         }
+    }
     return 0;
 }
 
@@ -41,11 +43,12 @@ unsigned byte(U p)
 void write_word(U p, unsigned value)
 {
     assert(user_address(p, 4));
-    for (unsigned i = 0; i < used; ++i)
+    for (unsigned i = 0; i < used; ++i) {
         if (memory[i].address == p) {
             memory[i].value = value;
             return;
         }
+    }
     assert(used < 4096);
     memory[used].address = p;
     memory[used++].value = value;
@@ -110,8 +113,9 @@ int sceKernelUnlockLwMutex(SceLwMutexWorkarea *p, int n)
 void position(U n, const float v[4])
 {
     ++dispatches;
-    for (unsigned i = 0; i < 4; ++i)
+    for (unsigned i = 0; i < 4; ++i) {
         write_word(n + 0x220 + i * 4, fbits(v[i]));
+    }
 }
 
 void visibility(U n, int v)
@@ -141,18 +145,21 @@ int paf_float_bits(U target, U node, unsigned id, unsigned bits)
 void destroy_text(U n)
 {
     ++destructions;
-    if (leave_registration)
+    if (leave_registration) {
         return;
+    }
     for (unsigned k = 0; k < 2; ++k) {
         U offset = k ? 0x1d8 : 0x1b4, data = word(parent + offset);
         unsigned count = word(parent + offset + 4);
-        for (unsigned i = 0; i < count; ++i)
+        for (unsigned i = 0; i < count; ++i) {
             if (word(data + i * 4) == n) {
-                for (unsigned j = i; j + 1 < count; ++j)
+                for (unsigned j = i; j + 1 < count; ++j) {
                     write_word(data + j * 4, word(data + (j + 1) * 4));
+                }
                 write_word(parent + offset + 4, count - 1);
                 break;
             }
+        }
     }
 }
 
@@ -197,9 +204,11 @@ static void setup(void)
     write_word(paf + 0x18b218 + 0x50, paf + 0xec178);
     const unsigned offsets[] = {0xb4, 0x0c, 0x54, 0x5c, 0x6c, 0x70, 0x74, 0x78, 0x98};
     const unsigned targets[] = {
-        0x105e20, 0x159004, 0x156cc4, 0xeced8, 0x105d88, 0x105dac, 0x105dd0, 0x105df8, 0xeebac};
-    for (unsigned i = 0; i < 9; ++i)
+        0x105e20, 0x159004, 0x156cc4, 0xeced8, 0x105d88, 0x105dac, 0x105dd0, 0x105df8, 0xeebac
+    };
+    for (unsigned i = 0; i < 9; ++i) {
         write_word(paf + 0x18b578 + offsets[i], paf + targets[i]);
+    }
     write_word(paf + 0x18c118 + 0x78, paf + 0x11a5c8);
     bar_nodes[0] = 0x09830000;
     bar_nodes[1] = 0x09840000;
@@ -215,26 +224,30 @@ static void setup(void)
         add_node(auxiliary_nodes[i], 0);
         write_word(vsh + 0x5cab8 + i * 4, auxiliary_nodes[i]);
     }
-    for (unsigned i = 0; i < 3; ++i)
+    for (unsigned i = 0; i < 3; ++i) {
         for (unsigned j = 0; j < 4; ++j) {
             baseline[i][j] = expected[i][j] = j == 3 ? 1 : 0;
             write_word(bar_nodes[i] + 0x220 + j * 4, fbits(expected[i][j]));
         }
-    U nodes[] = {clock_node,
-                 new_node,
-                 bar_nodes[0],
-                 bar_nodes[1],
-                 auxiliary_nodes[0],
-                 auxiliary_nodes[1],
-                 auxiliary_nodes[2],
-                 auxiliary_nodes[3]};
+    }
+    U nodes[] = {
+        clock_node,
+        new_node,
+        bar_nodes[0],
+        bar_nodes[1],
+        auxiliary_nodes[0],
+        auxiliary_nodes[1],
+        auxiliary_nodes[2],
+        auxiliary_nodes[3]
+    };
     for (unsigned k = 0; k < 2; ++k) {
         U offset = k ? 0x1d8 : 0x1b4, data = 0x09900000 + k * 0x1000;
         write_word(parent + offset, data);
         write_word(parent + offset + 4, 8);
         write_word(parent + offset + 8, 8);
-        for (unsigned i = 0; i < 8; ++i)
+        for (unsigned i = 0; i < 8; ++i) {
             write_word(data + i * 4, nodes[i]);
+        }
         totals[k] = 7;
     }
     U head = 0x09910000, item = head + 0x100, layout_data = head + 0x200;
@@ -382,14 +395,16 @@ static void test_install_defers_native_construction(void)
     destroy_text(new_node);
     new_node = 0;
     destructions = 0;
-    for (unsigned j = 0; j < 16; ++j)
+    for (unsigned j = 0; j < 16; ++j) {
         write_word(parent + 0x2a0 + j * 4, fbits(j % 5 == 0 ? 1 : 0));
+    }
     const float xs[] = {223, 225, 203}, ys[] = {124, 122, 123};
     for (unsigned i = 0; i < 3; ++i) {
         write_word(bar_nodes[i] + 0x220, fbits(xs[i]));
         write_word(bar_nodes[i] + 0x224, fbits(ys[i]));
-        for (unsigned j = 0; j < 3; ++j)
+        for (unsigned j = 0; j < 3; ++j) {
             write_word(bar_nodes[i] + 0x230 + j * 4, fbits(1));
+        }
         if (i < 2) {
             write_word(bar_nodes[i] + 0x320, fbits(44));
             write_word(bar_nodes[i] + 0x324, fbits(16));

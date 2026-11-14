@@ -15,9 +15,11 @@ static HomeNativeState s;
 static void source(unsigned left)
 {
     s.left = left;
-    for (unsigned y = 0; y < 17; ++y)
-        for (unsigned x = 0; x < 228; ++x)
+    for (unsigned y = 0; y < 17; ++y) {
+        for (unsigned x = 0; x < 228; ++x) {
             canonical[y * 228 + x] = x < left - 250 ? 0x9ce7 : (uint16_t)(0x8000 + y * 228 + x);
+        }
+    }
 }
 
 static void shape(unsigned percent)
@@ -25,8 +27,9 @@ static void shape(unsigned percent)
     sprite.percent = percent;
     sprite.height = 15;
     sprite.width = percent == 100 ? 44 : percent < 10 ? 21 + percent % 3 : 32 + percent % 8;
-    for (unsigned i = 0; i < 960; ++i)
+    for (unsigned i = 0; i < 960; ++i) {
         sprite.pixels[i] = (uint16_t)(0xc000 + i + percent);
+    }
 }
 
 static void verify(const uint16_t *shown)
@@ -34,30 +37,40 @@ static void verify(const uint16_t *shown)
     unsigned shift = sprite.width + 4, px = 228 - sprite.width;
     /* Independent pixel oracle: include Sony's rounded alignment column. */
     unsigned start = s.left - 250;
-    if (start > shift)
+    if (start > shift) {
         --start;
-    for (unsigned y = 0; y < 17; ++y)
+    }
+    for (unsigned y = 0; y < 17; ++y) {
         for (unsigned x = 0; x < 228; ++x) {
             uint16_t expected = 0x9ce7;
-            if (x + shift >= start && x + shift < 228)
+            if (x + shift >= start && x + shift < 228) {
                 expected = canonical[y * 228 + x + shift];
-            if (y < 15 && x >= px)
+            }
+            if (y < 15 && x >= px) {
                 expected = sprite.pixels[y * 64 + x - px];
+            }
             assert(shown[y * 228 + x] == expected);
         }
+    }
 }
 
 static void verify_native(void)
 {
     verify(bar.presentation);
     assert(bar.presented && bar.width == sprite.width && bar.percent == sprite.percent);
-    for (unsigned y = 0; y < 272; ++y)
-        for (unsigned x = 0; x < 512; ++x)
-            assert(native[y * 512 + x] == ((y >= 5 && y < 22 && x >= 250 && x < 478)
-                                               ? bar.presentation[(y - 5) * 228 + x - 250]
-                                               : 0x1234));
-    assert(storage[0] == 0x1234 && storage[1] == 0x1234 && storage[512 * 272 + 2] == 0x1234 &&
-           storage[512 * 272 + 3] == 0x1234);
+    for (unsigned y = 0; y < 272; ++y) {
+        for (unsigned x = 0; x < 512; ++x) {
+            assert(
+                native[y * 512 + x] == ((y >= 5 && y < 22 && x >= 250 && x < 478)
+                                            ? bar.presentation[(y - 5) * 228 + x - 250]
+                                            : 0x1234)
+            );
+        }
+    }
+    assert(
+        storage[0] == 0x1234 && storage[1] == 0x1234 && storage[512 * 272 + 2] == 0x1234 &&
+        storage[512 * 272 + 3] == 0x1234
+    );
 }
 
 static unsigned before(const HomeSprite *frame)
@@ -73,9 +86,11 @@ static unsigned after(const HomeSprite *frame)
 static void native_full(unsigned left)
 {
     source(left);
-    for (unsigned y = 0; y < 17; ++y)
-        for (unsigned x = 0; x < 228; ++x)
+    for (unsigned y = 0; y < 17; ++y) {
+        for (unsigned x = 0; x < 228; ++x) {
             native[(y + 5) * 512 + 250 + x] = canonical[y * 228 + x];
+        }
+    }
     s.b8 = 0x3bf;
 }
 
@@ -96,9 +111,11 @@ static void test_exhaustive_geometry(void)
             assert(plan.battery_x + 28 + 4 == plan.percent_x);
             assert(plan.moved_left == left - width - 4);
             output[0] = output[HOME_BAR_PIXELS + 1] = 0x1234;
-            assert(home_bar_compose(
-                       canonical, HOME_BAR_PIXELS, left, &sprite, output + 1, HOME_BAR_PIXELS) ==
-                   0);
+            assert(
+                home_bar_compose(
+                    canonical, HOME_BAR_PIXELS, left, &sprite, output + 1, HOME_BAR_PIXELS
+                ) == 0
+            );
             verify(output + 1);
             assert(output[0] == 0x1234 && output[HOME_BAR_PIXELS + 1] == 0x1234);
         }
@@ -107,13 +124,16 @@ static void test_exhaustive_geometry(void)
     source(338);
     sprite.width = 37;
     canonical[87] = 0xabcd;
-    assert(home_bar_compose(
-               canonical, HOME_BAR_PIXELS, 338, &sprite, output + 1, HOME_BAR_PIXELS) == 0);
+    assert(
+        home_bar_compose(canonical, HOME_BAR_PIXELS, 338, &sprite, output + 1, HOME_BAR_PIXELS) == 0
+    );
     assert(output[1 + 87 - 41] == 0xabcd);
     canonical[0] = 0xbeef;
     memcpy(saved, output, sizeof(output));
-    assert(home_bar_compose(
-               canonical, HOME_BAR_PIXELS, 338, &sprite, output + 1, HOME_BAR_PIXELS) == -2);
+    assert(
+        home_bar_compose(canonical, HOME_BAR_PIXELS, 338, &sprite, output + 1, HOME_BAR_PIXELS) ==
+        -2
+    );
     assert(!memcmp(saved, output, sizeof(output)));
     s.left = 300;
     HomeBarPlan plan;
@@ -127,8 +147,9 @@ static void start_session(unsigned percent)
     memset(&bar, 0, sizeof(bar));
     binding = test_home_binding();
     s = test_home_scene();
-    for (unsigned i = 0; i < 512 * 272 + 4; ++i)
+    for (unsigned i = 0; i < 512 * 272 + 4; ++i) {
         storage[i] = 0x1234;
+    }
     shape(percent);
     native_full(338);
     assert(before(&sprite) == 0 && after(&sprite) == 0);
@@ -171,12 +192,16 @@ static void test_native_partial_update(void)
     /* Native partial battery update retains original canonical coordinates. */
     s.b8 = 0x33f;
     assert(before(&sprite) == 0 && !bar.presented);
-    for (unsigned y = 0; y < 17; ++y)
-        for (unsigned x = 0; x < 228; ++x)
+    for (unsigned y = 0; y < 17; ++y) {
+        for (unsigned x = 0; x < 228; ++x) {
             assert(native[(y + 5) * 512 + 250 + x] == canonical[y * 228 + x]);
-    for (unsigned y = 0; y < 17; ++y)
-        for (unsigned x = 200; x < 228; ++x)
+        }
+    }
+    for (unsigned y = 0; y < 17; ++y) {
+        for (unsigned x = 200; x < 228; ++x) {
             native[(y + 5) * 512 + 250 + x] = canonical[y * 228 + x] = 0xabcd;
+        }
+    }
     s.b8 = 0x3bf;
     shape(9);
     assert(after(&sprite) == 0);
@@ -195,9 +220,11 @@ static void test_suspended_geometry(void)
     assert(after(&sprite) == 4 && bar.width != sprite.width && bar.presented);
     s.b8 = 0x33f;
     assert(before(&sprite) == 0 && !bar.presented && !bar.wait_full);
-    for (unsigned y = 0; y < 17; ++y)
-        for (unsigned x = 0; x < 228; ++x)
+    for (unsigned y = 0; y < 17; ++y) {
+        for (unsigned x = 0; x < 228; ++x) {
             assert(native[(y + 5) * 512 + 250 + x] == canonical[y * 228 + x]);
+        }
+    }
     s.b8 = 0x3bf;
     assert(after(&sprite) == 0);
     verify_native();

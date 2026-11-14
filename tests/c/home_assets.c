@@ -33,12 +33,14 @@ static const unsigned char expected[3][20] = {
     {0xca, 0xf7, 0x1c, 0x8b, 0xed, 0x92, 0x37, 0x49, 0xea, 0x3b,
      0x8b, 0xb9, 0x6b, 0xc0, 0xa5, 0x8c, 0x4c, 0x10, 0x52, 0x98},
     {0x1a, 0x01, 0x1d, 0xc6, 0x1c, 0xb7, 0x72, 0x18, 0xf5, 0x48,
-     0xdc, 0xf6, 0x24, 0xbb, 0x18, 0x79, 0x04, 0xdd, 0x82, 0x94}};
+     0xdc, 0xf6, 0x24, 0xbb, 0x18, 0x79, 0x04, 0xdd, 0x82, 0x94}
+};
 
 static void put32(unsigned at, unsigned value)
 {
-    for (unsigned i = 0; i < 4; ++i)
+    for (unsigned i = 0; i < 4; ++i) {
         resource[at + i] = (unsigned char)(value >> (8 * i));
+    }
 }
 
 static void init(void)
@@ -50,13 +52,14 @@ static void init(void)
     memset(font, 0, sizeof(font));
     put32(112, 256);
     put32(256, 4800);
-    for (unsigned d = 0; d < 10; ++d)
+    for (unsigned d = 0; d < 10; ++d) {
         for (unsigned i = 0; i < 240; ++i) {
             unsigned value = i % 16 < (d == 1 ? 6u : 10u) ? 0xffff : 0x9ce7;
             unsigned at = 260 + (d * 240 + i) * 2;
             resource[at] = (unsigned char)value;
             resource[at + 1] = (unsigned char)(value >> 8);
         }
+    }
     memset(&result, 0xa5, sizeof(result));
     saved = result;
 }
@@ -66,10 +69,12 @@ int sceIoOpen(const char *path, int flags, int mode)
     assert(!active && flags == 1 && mode == 0);
     ++opens;
     assert(!strcmp(path, opens == 1 ? "flash0:/kd/resource/impose.rsc" : "flash0:/font/ltn8.pgf"));
-    if (opens == 2)
+    if (opens == 2) {
         assert(hashes == 1 && !decoded);
-    if (failure == OPEN && target == opens)
+    }
+    if (failure == OPEN && target == opens) {
         return -1;
+    }
     active = opens;
     position = 0;
     return active;
@@ -78,21 +83,28 @@ int sceIoOpen(const char *path, int flags, int mode)
 int sceIoRead(int fd, void *buffer, unsigned count)
 {
     assert(active == fd && count > 0);
-    if (target == active && failure == READ)
+    if (target == active && failure == READ) {
         return -1;
-    if (target == active && failure == OVERSIZED_READ)
+    }
+    if (target == active && failure == OVERSIZED_READ) {
         return (int)count + 1;
+    }
     unsigned length = active == 1 ? 113676u : 41000u;
-    if (target == active && failure == SHORT)
+    if (target == active && failure == SHORT) {
         --length;
-    if (target == active && failure == LONG)
+    }
+    if (target == active && failure == LONG) {
         ++length;
-    if (position == length)
+    }
+    if (position == length) {
         return 0;
-    if (count > 97)
+    }
+    if (count > 97) {
         count = 97; /* Force hundreds of partial reads. */
-    if (count > length - position)
+    }
+    if (count > length - position) {
         count = length - position;
+    }
     memcpy(buffer, (active == 1 ? resource : font) + position, count);
     position += count;
     return (int)count;
@@ -112,31 +124,38 @@ int sceKernelUtilsSha1Digest(unsigned char *bytes, unsigned size, unsigned char 
     int index = hashes++;
     assert(index < 3 && size == (index == 0 ? 113676u : index == 1 ? 41000u : 1920u));
     if ((failure == HASH_ERROR && target == index + 1) ||
-        (failure == SPRITE_HASH_ERROR && index == 2))
+        (failure == SPRITE_HASH_ERROR && index == 2)) {
         return -1;
+    }
     memcpy(digest, expected[index], 20);
     if ((failure == HASH_MISMATCH && target == index + 1) ||
-        (failure == SPRITE_HASH_MISMATCH && index == 2))
+        (failure == SPRITE_HASH_MISMATCH && index == 2)) {
         digest[0] ^= 1;
-    if (index == 0)
+    }
+    if (index == 0) {
         assert(!memcmp(bytes, resource, size));
-    if (index == 1)
+    }
+    if (index == 1) {
         assert(!memcmp(bytes, font, size));
+    }
     return 0;
 }
 
 int pgf_glyph(const unsigned char *data, size_t size, unsigned character, PgfGlyph *out)
 {
-    assert(!active && hashes == 2 && size == 41000 && character == '%' &&
-           !memcmp(data, font, size));
+    assert(
+        !active && hashes == 2 && size == 41000 && character == '%' && !memcmp(data, font, size)
+    );
     ++decoded;
-    if (failure == DECODE)
+    if (failure == DECODE) {
         return -1;
+    }
     memset(out, 0, sizeof(*out));
     out->width = failure == BAD_GLYPH ? 12 : 11;
     out->height = 11;
-    for (unsigned i = 0; i < 11; ++i)
+    for (unsigned i = 0; i < 11; ++i) {
         out->pixels[i * 11 + i] = 15;
+    }
     return 0;
 }
 
@@ -163,10 +182,12 @@ static void test_failures_are_transactional(void)
             init();
             failure = f;
             target = t;
-            if (f == BAD_OFFSET)
+            if (f == BAD_OFFSET) {
                 put32(112, 113676 - 4803);
-            if (f == BAD_LENGTH)
+            }
+            if (f == BAD_LENGTH) {
                 put32(256, 4799);
+            }
             int code = home_assets_prepare(&result, &work);
             int expected_code = f <= LONG || f == OVERSIZED_READ              ? -10
                                 : f == DECODE                                 ? -13
@@ -175,8 +196,9 @@ static void test_failures_are_transactional(void)
             assert(code == expected_code && !active);
             assert(closes == opens - (f == OPEN ? 1 : 0));
             assert(!memcmp(&saved, &result, sizeof(result)));
-            if (f <= HASH_MISMATCH || f == OVERSIZED_READ)
+            if (f <= HASH_MISMATCH || f == OVERSIZED_READ) {
                 assert(decoded == 0);
+            }
         }
     }
 }

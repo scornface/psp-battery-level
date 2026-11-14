@@ -23,8 +23,9 @@ int main(int argc, char **argv)
     out.before = out.after = 0x12345678;
     assert(!pgf_glyph(data, size, '%', &out.glyph));
     assert(out.glyph.width == 1 && out.glyph.height == 1 && out.glyph.pixels[0] == 15);
-    for (size_t length = 0; length < size; ++length)
+    for (size_t length = 0; length < size; ++length) {
         pgf_glyph(data, length, '%', &out.glyph);
+    }
     for (size_t i = 0; i < size; ++i) {
         unsigned char original = data[i];
         for (unsigned bit = 0; bit < 8; ++bit) {

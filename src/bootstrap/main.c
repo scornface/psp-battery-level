@@ -36,21 +36,24 @@ static int run(SceSize size, void *arg)
 {
     (void)size;
     (void)arg;
-    if (stopping)
+    if (stopping) {
         goto done;
-    context = battery_context(sceKernelDevkitVersion(),
-                              sceKernelGetModel(),
-                              sceKernelInitKeyConfig(),
-                              sctrlSEGetVersion(),
-                              sctrlHENGetVersion(),
-                              sctrlHENGetMinorVersion());
+    }
+    context = battery_context(
+        sceKernelDevkitVersion(),
+        sceKernelGetModel(),
+        sceKernelInitKeyConfig(),
+        sctrlSEGetVersion(),
+        sctrlHENGetVersion(),
+        sctrlHENGetMinorVersion()
+    );
     if (!context) {
         outcome = -12;
         goto done;
     }
-    if (context == BATTERY_VSH)
+    if (context == BATTERY_VSH) {
         outcome = battery_vsh_start();
-    else {
+    } else {
 #if BATTERY_DIAGNOSTICS
         outcome = home_run(&stopping, poll);
 #else
@@ -69,8 +72,9 @@ int module_start(SceSize size, void *arg)
     (void)arg;
     /* A stopped/failed instance must be unloaded and freshly loaded, not
      * restarted with stale backend ownership or stop/publication state. */
-    if (worker >= 0 || finished || stopping)
+    if (worker >= 0 || finished || stopping) {
         return -1;
+    }
     worker = sceKernelCreateThread("battery_bootstrap", run, 0x30, 0x8000, 0, 0);
     if (worker < 0) {
         finished = 1;
@@ -98,22 +102,27 @@ int module_stop(SceSize size, void *arg)
     }
     stopping = 1;
     sceKernelCpuResumeIntr(irq);
-    for (unsigned i = 0; !finished && i < 30; ++i)
+    for (unsigned i = 0; !finished && i < 30; ++i) {
         sceKernelDelayThread(100000);
-    if (!finished)
+    }
+    if (!finished) {
         return -1;
+    }
     if (worker >= 0) {
         unsigned timeout = 100000;
-        if (sceKernelWaitThreadEnd(worker, &timeout) < 0)
+        if (sceKernelWaitThreadEnd(worker, &timeout) < 0) {
             return -1;
+        }
     }
     /* A loaded/partly started child is owned even when startup failed. Its own
      * callback cleanup must succeed before either module can be unloaded. */
-    if (battery_vsh_stop() < 0)
+    if (battery_vsh_stop() < 0) {
         return -1;
+    }
     if (worker >= 0) {
-        if (sceKernelDeleteThread(worker) < 0)
+        if (sceKernelDeleteThread(worker) < 0) {
             return -1;
+        }
         worker = -1;
     }
     return 0;

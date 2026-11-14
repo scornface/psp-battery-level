@@ -21,15 +21,18 @@ static unsigned entries;
 
 static int log_word(LogBuffer *buffer, const char *key, unsigned value)
 {
-    if (buffer->length > sizeof(buffer->data) - 80)
+    if (buffer->length > sizeof(buffer->data) - 80) {
         return 0;
+    }
     char *line = buffer->data + buffer->length;
     unsigned length = 0;
-    while (*key && length < 60)
+    while (*key && length < 60) {
         line[length++] = *key++;
+    }
     line[length++] = '=';
-    for (int shift = 28; shift >= 0; shift -= 4)
+    for (int shift = 28; shift >= 0; shift -= 4) {
         line[length++] = "0123456789abcdef"[(value >> shift) & 15];
+    }
     line[length++] = '\n';
     buffer->length += length;
     return 1;
@@ -37,8 +40,9 @@ static int log_word(LogBuffer *buffer, const char *key, unsigned value)
 
 static int log_status(const Status *s, unsigned entry)
 {
-    if (sceUsbGetDrvState("USBStor_Driver") == 1)
+    if (sceUsbGetDrvState("USBStor_Driver") == 1) {
         return 0;
+    }
     LogBuffer buffer = {.length = 0};
     int success = log_word(&buffer, "build_id", BUILD_ID);
 #define LOG(field) success &= log_word(&buffer, #field, s->field)
@@ -101,12 +105,14 @@ static int log_status(const Status *s, unsigned entry)
     LOG(usb_pauses);
     success &= log_word(&buffer, "log_limit", LOG_LIMIT);
 #undef LOG
-    if (!success || sceUsbGetDrvState("USBStor_Driver") == 1)
+    if (!success || sceUsbGetDrvState("USBStor_Driver") == 1) {
         return 0;
+    }
     int flags = PSP_O_WRONLY | PSP_O_CREAT | (entry ? PSP_O_APPEND : PSP_O_TRUNC);
     int fd = sceIoOpen("ms0:/SEPLUGINS/battery-level.log", flags, 0777);
-    if (fd < 0)
+    if (fd < 0) {
         return 0;
+    }
     success = sceIoWrite(fd, buffer.data, buffer.length) == (int)buffer.length;
     success &= sceIoClose(fd) >= 0;
     return success;
@@ -148,8 +154,9 @@ void diagnostics_terminal(void)
     /* Reserve a terminal entry beyond the ordinary cap. A failure under USB
      * must remain recoverable after leaving USB; stop cancels the retry loop.
      */
-    while (!stop_requested && !log_status(&current, entries))
+    while (!stop_requested && !log_status(&current, entries)) {
         sceKernelDelayThread(1000000);
+    }
 }
 
 void diagnostics_lock_failed(int error)

@@ -6,7 +6,7 @@
 #include <pspthreadman.h>
 #include <psppower.h>
 #if BATTERY_DIAGNOSTICS
-#include <pspusb.h>
+    #include <pspusb.h>
 #endif
 #include "native.h"
 #include "xmb.h"
@@ -83,8 +83,9 @@ static int run(SceSize size, void *arg)
 #else
         result = native_discover(0);
 #endif
-        if (result == 0 || result == -2)
+        if (result == 0 || result == -2) {
             break;
+        }
         sceKernelDelayThread(100000);
     }
     if (result < 0) {
@@ -109,8 +110,9 @@ static int run(SceSize size, void *arg)
                 diagnostics_begin(&status);
             }
             xmb_unlock();
-            if (!result)
+            if (!result) {
                 break;
+            }
         }
         sceKernelDelayThread(100000);
     }
@@ -128,8 +130,9 @@ static int run(SceSize size, void *arg)
         int raw_percent = percent, charging = scePowerIsBatteryCharging();
         int ac = scePowerIsPowerOnline(), usb_driver = sceUsbGetDrvState("USBStor_Driver");
 #endif
-        if (exists != 1 || percent < 0 || percent > 100)
+        if (exists != 1 || percent < 0 || percent > 100) {
             percent = -1;
+        }
         int locked = xmb_lock();
         if (locked < 0) {
             /* Do not inspect nodes/shared state after a failed lock. */
@@ -168,7 +171,8 @@ int module_start(SceSize size, void *arg)
     (void)size;
     (void)arg;
     worker = sceKernelCreateThread(
-        "battery_level", run, 0x30, 0x8000, PSP_THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU, 0);
+        "battery_level", run, 0x30, 0x8000, PSP_THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU, 0
+    );
     if (worker < 0) {
         worker_finished = 1;
         return worker;
@@ -190,16 +194,20 @@ int module_stop(SceSize size, void *arg)
     /* Cleanup belongs to the callback. If USB/suspend pauses callbacks, refuse
      * unload instead of leaving hooks pointing into freed plugin memory.
      */
-    for (unsigned i = 0; !worker_finished && i < 30; ++i)
+    for (unsigned i = 0; !worker_finished && i < 30; ++i) {
         sceKernelDelayThread(100000);
-    if (!worker_finished)
+    }
+    if (!worker_finished) {
         return -1;
+    }
     if (worker >= 0) {
         unsigned timeout = 100000;
-        if (sceKernelWaitThreadEnd(worker, &timeout) < 0)
+        if (sceKernelWaitThreadEnd(worker, &timeout) < 0) {
             return -1;
-        if (hooks_published && !xmb_can_unload())
+        }
+        if (hooks_published && !xmb_can_unload()) {
             return -1;
+        }
         sceKernelDeleteThread(worker);
         worker = -1;
     }

@@ -6,11 +6,13 @@
  */
 static int clock_reset(float actual, float expected_x, int battery_visible, float *reference)
 {
-    if (actual == expected_x)
+    if (actual == expected_x) {
         return 0;
+    }
     float native_x = battery_visible ? 203 : 235;
-    if (actual != native_x)
+    if (actual != native_x) {
         return -31;
+    }
     *reference = native_x;
     return 1;
 }

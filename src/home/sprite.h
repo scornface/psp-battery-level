@@ -31,11 +31,13 @@ typedef struct {
  * Uses original-size percent coverage and one blank bright column. Flattened
  * tile overlaps retain brighter foreground, otherwise the darker shadow.
  */
-int home_tiles_prepare(HomeTiles *out,
-                       const uint16_t *atlas,
-                       size_t words,
-                       const unsigned char *percent,
-                       unsigned width,
-                       unsigned height);
+int home_tiles_prepare(
+    HomeTiles *out,
+    const uint16_t *atlas,
+    size_t words,
+    const unsigned char *percent,
+    unsigned width,
+    unsigned height
+);
 int home_sprite_compose(const HomeTiles *tiles, unsigned percent, HomeSprite *out);
 #endif

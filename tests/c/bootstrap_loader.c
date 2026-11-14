@@ -8,10 +8,9 @@ extern unsigned char battery_vsh_image[128];
 static SceModule module;
 static int failure, loads, starts, stops, unloads;
 
-SceUID sceKernelLoadModuleBufferForKernel(SceSize size,
-                                          void *data,
-                                          int flags,
-                                          SceKernelLMOption *option)
+SceUID sceKernelLoadModuleBufferForKernel(
+    SceSize size, void *data, int flags, SceKernelLMOption *option
+)
 {
     assert(size == 128 && data == battery_vsh_image && !flags);
     assert(option->size == sizeof(*option) && option->mpidtext == 2 && option->mpiddata == 2);
@@ -65,12 +64,15 @@ int main(int argc, char **argv)
     module.text_size = module.segmentsize[0] = 0x1000;
     module.segmentaddr[1] = 0x08820000;
     module.segmentsize[1] = 0x100;
-    if (failure == 2 || failure == 10)
+    if (failure == 2 || failure == 10) {
         module.modname[0] = 'X';
-    if (failure == 3)
+    }
+    if (failure == 3) {
         module.segmentaddr[1] = 0x88000000;
-    if (failure == 4)
+    }
+    if (failure == 4) {
         module.attribute = 0x1000;
+    }
     int result = battery_vsh_start();
     if (failure == 11) {
         assert(result == -24 && !loads && !starts && !unloads);
@@ -100,12 +102,14 @@ int main(int argc, char **argv)
     assert(battery_vsh_start() == -20 && loads == 1);
     if (failure == 6 || failure == 7 || failure == 8) {
         assert(battery_vsh_stop() == -1);
-        if (failure != 7)
+        if (failure != 7) {
             assert(!unloads);
+        }
         failure = 0;
         assert(!battery_vsh_stop());
-    } else
+    } else {
         assert(!battery_vsh_stop());
+    }
     assert(!battery_vsh_stop());
     return 0;
 }
