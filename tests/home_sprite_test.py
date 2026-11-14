@@ -1,24 +1,18 @@
 """Portable owned-memory composition; synthetic assets, no Sony dependencies."""
 import ctypes
-import os
 from pathlib import Path
-import subprocess
-import sys
-import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1]
+from support import ROOT, temporary_directory, compile_library
 from home_types import Tiles, Sprite, load_library
 
 
 class HomeSpriteTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        (ROOT / "build/tests").mkdir(parents=True, exist_ok=True)
-        cls.directory = tempfile.TemporaryDirectory(dir=ROOT / "build/tests")
+        cls.directory = temporary_directory()
         binary = Path(cls.directory.name) / "sprite.so"
-        subprocess.run([os.environ.get("CC", "cc"), "-std=c99", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
-                        str(ROOT / "src/home/sprite.c"), "-o", str(binary)], check=True, capture_output=True)
+        compile_library(binary, ROOT / "src/home/sprite.c")
         cls.lib = load_library(binary)
 
     @classmethod

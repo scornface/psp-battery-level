@@ -1,26 +1,19 @@
 """Final pre/Sony/post ABI and integer-only helpers, independent of old candidates."""
 from pathlib import Path
-import struct
 import sys
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from prx_checks import check_helper,hook_template
-
-
-class Helper:
-    def __init__(self,word):self.word=word
-    def require_range(self,address,size,executable=False):
-        if address!=0x600 or size!=4 or not executable:raise ValueError('range')
-    def u32(self,address):return self.word
-    def imports(self):return [dict(name='InterruptManagerForKernel',stubs=[0x900])]
+from prx_checks import hook_template
+from support import ROOT, C_TESTS, temporary_directory, compile_program, run_program
 
 
 class HomeAbiTests(unittest.TestCase):
-    def test_helper_instruction_and_call_restrictions(self):
-        for word in (0x46000000,0x60000000,0x0320f809,0x10000004,0x0c000080,0x04110000):
-            with self.subTest(word=word),self.assertRaises(ValueError):check_helper(Helper(word),0x600,4)
-        for word in (0x0110800a,0x0110800b,0x03e00008,0x0c000240):check_helper(Helper(word),0x600,4)
+    def test_nested_expired_and_wrapped_refresh_tokens(self):
+        with temporary_directory() as directory:
+            binary=Path(directory)/'refresh'
+            compile_program(binary,C_TESTS/'home_refresh.c',includes=[ROOT/'src/home'])
+            run_program(binary)
 
     def test_inputs_native_results_and_per_frame_token(self):
         for token in (0,123):

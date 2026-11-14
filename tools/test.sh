@@ -4,14 +4,15 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 OUTPUT="$ROOT/build/tests"
 CC=${CC:-cc}
+export CC
+case "${1:-}" in
+    '') ;;
+    --sanitize) TEST_SANITIZE=1; export TEST_SANITIZE ;;
+    *) printf 'Usage: %s [--sanitize]\n' "$0" >&2; exit 2 ;;
+esac
+if [ "$#" -gt 1 ]; then
+    printf 'Usage: %s [--sanitize]\n' "$0" >&2
+    exit 2
+fi
 mkdir -p "$OUTPUT"
-for POLICY in layout recovery update; do
-    "$CC" -std=c99 -Wall -Wextra -Werror "$ROOT/tests/${POLICY}_policy.c" \
-        -o "$OUTPUT/${POLICY}_policy"
-    "$OUTPUT/${POLICY}_policy"
-    printf '%s policy passed\n' "$POLICY"
-done
-"$CC" -std=c99 -Wall -Wextra -Werror -I"$ROOT/tests" "$ROOT/tests/runtime_controller.c" -o "$OUTPUT/runtime_controller"
-"$OUTPUT/runtime_controller"
-printf 'runtime controller passed\n'
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$ROOT/tests" -p '*_test.py'

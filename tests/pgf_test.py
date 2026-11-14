@@ -1,72 +1,88 @@
-"""Bounded PGF decoder tests with synthetic data, not distributed Sony glyphs."""
+"""PGF foreground parsing with synthetic row/column, RLE and metric records."""
 import ctypes
-import os
 from pathlib import Path
 import struct
-import subprocess
-import sys
-import tempfile
 import unittest
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
-
-
-class Glyph(ctypes.Structure):
-    _fields_ = [("width", ctypes.c_uint), ("height", ctypes.c_uint),
-                ("left", ctypes.c_int), ("top", ctypes.c_int), ("advance", ctypes.c_int),
-                ("pixels", ctypes.c_ubyte * 1024)]
+from home_types import Glyph
+from pgf_fixture import glyph
+from support import ROOT, C_TESTS, temporary_directory, compile_library, compile_program, run_program
 
 
-def synthetic():
-    d = bytearray(444)
-    struct.pack_into("<H", d, 2, 392); d[4:8] = b"PGF0"
-    struct.pack_into("<I", d, 8, 2)
-    struct.pack_into("<4I", d, 16, 1, 1, 1, 1)
-    struct.pack_into("<H", d, 182, ord("%"))
-    pos = 400 * 8
-    def put(v, n):
-        nonlocal pos
-        for i in range(n):
-            if v & (1 << i): d[pos // 8] |= 1 << (pos % 8)
-            pos += 1
-    for v, n in [(44,14),(1,7),(1,7),(0,7),(1,7),(1,6),(0,7),(0,9)]: put(v,n)
-    for v in (0,0,0,0,0,0,64,0): put(v,32)
-    put(0,4); put(15,4)
-    return d
-
-
-class FontProbeTests(unittest.TestCase):
+class PgfTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp = tempfile.TemporaryDirectory(dir=ROOT / "build/tests")
+        cls.temp = temporary_directory()
         binary = Path(cls.temp.name) / "pgf.so"
-        subprocess.run([os.environ.get("CC", "cc"), "-std=c99", "-Wall", "-Wextra", "-Werror",
-                         "-shared", "-fPIC", str(ROOT / "src/home/pgf.c"), "-o", str(binary)],
-                       check=True, capture_output=True)
+        compile_library(binary, ROOT / "src/home/pgf.c")
         cls.lib = ctypes.CDLL(str(binary))
         cls.decode = cls.lib.pgf_glyph
         cls.decode.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint, ctypes.POINTER(Glyph)]
 
     @classmethod
-    def tearDownClass(cls): cls.temp.cleanup()
+    def tearDownClass(cls):
+        cls.temp.cleanup()
 
-    def result(self, d, char=ord("%")):
-        b = ctypes.create_string_buffer(bytes(d)); g = Glyph()
-        return self.decode(b, len(d), char, ctypes.byref(g)), g
+    def result(self, data, character=ord("%")):
+        buffer = ctypes.create_string_buffer(bytes(data))
+        out = Glyph()
+        return self.decode(buffer, len(data), character, ctypes.byref(out)), out
 
-    def test_glyph(self):
-        r,g = self.result(synthetic())
-        self.assertEqual(r, 0)
-        self.assertEqual((g.width,g.height,g.left,g.top,g.advance,g.pixels[0]), (1,1,0,1,64,15))
+    def test_original_coverage_and_metrics(self):
+        result, out = self.result(glyph())
+        self.assertEqual(result, 0)
+        self.assertEqual((out.width, out.height, out.left, out.top, out.advance, out.pixels[0]),
+                         (1, 1, 0, 1, 64, 15))
 
-    def test_bounds(self):
-        d = synthetic()
-        for length in (0, 391, 392, 400, 439):
-            self.assertLess(self.result(d[:length])[0], 0)
-        for offset, value in ((8,3),(24,32),(16,0xffffffff),(20,0xffffffff),(364,0xffffffff)):
-            bad=d[:];struct.pack_into("<I",bad,offset,value)
-            self.assertLess(self.result(bad)[0], 0)
-        self.assertLess(self.result(d,ord("9"))[0],0)
-        bad=d[:];bad[400:402]=b"\xff\x3f"
-        self.assertLess(self.result(bad)[0],0)
+    def test_literal_and_repeated_runs_in_both_orders(self):
+        for order, expected in ((1, [1, 2, 3, 4]), (2, [1, 3, 2, 4])):
+            with self.subTest(order=order):
+                result, out = self.result(glyph(2, 2, order, runs=[[1, 2, 3, 4]]))
+                self.assertEqual(result, 0)
+                self.assertEqual(list(out.pixels[:4]), expected)
+                result, out = self.result(glyph(2, 2, order, runs=[(4, 7)]))
+                self.assertEqual(result, 0)
+                self.assertEqual(list(out.pixels[:4]), [7] * 4)
+
+    def test_run_cannot_exceed_dimensions(self):
+        self.assertEqual(self.result(glyph(runs=[(8, 15)]))[0], -8)
+
+    def test_indirect_advance_and_invalid_index(self):
+        result, out = self.result(glyph(advance_index=0, advance=128))
+        self.assertEqual(result, 0)
+        self.assertEqual(out.advance, 128)
+        self.assertEqual(out.pixels[0], 15)
+        self.assertEqual(self.result(glyph(advance_index=1))[0], -7)
+        for advance in (0, 2049):
+            self.assertEqual(self.result(glyph(advance=advance))[0], -7)
+
+    def test_header_table_and_record_bounds(self):
+        data = glyph()
+        for length in (0, 391, 392, 400, len(data) - 1):
+            with self.subTest(length=length):
+                self.assertLess(self.result(data[:length])[0], 0)
+        for offset, value in ((8, 3), (24, 32), (16, 0xffffffff), (20, 0xffffffff), (364, 0xffffffff)):
+            bad = data[:]
+            struct.pack_into("<I", bad, offset, value)
+            with self.subTest(offset=offset):
+                self.assertLess(self.result(bad)[0], 0)
+        self.assertLess(self.result(data, ord("9"))[0], 0)
+        bad = data[:]
+        bad[400:402] = b"\xff\x3f"
+        self.assertLess(self.result(bad)[0], 0)
+        # The file contains bitmap bytes, but the glyph span excludes them.
+        bad = data[:]
+        bad[400] = 40
+        bad[401] &= 0xc0
+        self.assertEqual(self.result(bad)[0], -9)
+        for order in (0, 3):
+            self.assertEqual(self.result(glyph(order=order))[0], -6)
+
+    def test_all_prefixes_and_single_bit_mutations_preserve_bounds(self):
+        with temporary_directory() as directory:
+            path = Path(directory)
+            sample = path / "synthetic.pgf"
+            sample.write_bytes(glyph())
+            binary = path / "bounds"
+            compile_program(binary, C_TESTS / "pgf_bounds.c", ROOT / "src/home/pgf.c",
+                            includes=[ROOT / "src/home"])
+            run_program(binary, sample)

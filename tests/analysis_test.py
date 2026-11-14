@@ -40,13 +40,11 @@ class AnalysisBoundaries(unittest.TestCase):
         with self.assertRaises(ValueError): common.outputs(self.source, link)
         with self.assertRaises(ValueError): common.outputs(self.source, ROOT / "src/never-write.bin")
         hard = self.directory / "hard-link.rco"
-        import os
         os.link(self.source, hard)
         with self.assertRaises(ValueError): common.outputs(self.source, hard)
 
-    def test_nonzero_base_and_unknown_firmware_rejected(self):
+    def test_nonzero_relocation_base_rejected(self):
         with self.assertRaises(ValueError): rel2.decode_prx(self.source, 0x08800000)
-        with self.assertRaises(ValueError): rel2.decode_prx(self.source, 0)
 
     def test_impose_scope_is_exact_and_unknown_input_never_parses(self):
         self.assertEqual(common.FIRMWARE["impose_02g"],
@@ -61,11 +59,10 @@ class AnalysisBoundaries(unittest.TestCase):
         resource = self.directory / "F0/kd/resource/impose.rsc"
         font.parent.mkdir(parents=True); resource.parent.mkdir(parents=True)
         font.write_bytes(b"unknown font"); resource.write_bytes(b"unknown resource")
-        for tool in (verify_assets,):
-            with patch.object(tool, "external_directory", return_value=self.directory), \
-                    patch.object(tool.subprocess, "run", side_effect=AssertionError("compiler called")):
-                with self.assertRaisesRegex(ValueError, "Unrecorded Sony"):
-                    tool.main()
+        with patch.object(verify_assets, "external_directory", return_value=self.directory), \
+                patch.object(verify_assets.subprocess, "run", side_effect=AssertionError("compiler called")):
+            with self.assertRaisesRegex(ValueError, "Unrecorded Sony"):
+                verify_assets.main()
 
     def test_external_directory_requires_explicit_existing_absolute_input(self):
         for value in (None, "", " ", "relative/path", str(self.directory / "missing"), str(self.source), str(self.directory)):

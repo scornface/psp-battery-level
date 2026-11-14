@@ -5,17 +5,22 @@
 #include <string.h>
 #define BATTERY_HOST_TEST 1
 #define BATTERY_DIAGNOSTICS 0
-#include "../src/vsh/native.c"
-#include "../src/vsh/xmb.c"
+#include "../../src/vsh/native.c"
+#include "../../src/vsh/xmb.c"
 
 volatile int stop_requested;
 static struct { U address; unsigned value; } memory[4096];
 static unsigned used, dispatches, destructions, reflows, reads, try_failure;
 static int leave_registration;
+static U mutate_address;
+static unsigned mutate_reads, mutate_value;
 unsigned word(U p)
 {
     assert(user_address(p, 4)); ++reads;
-    for (unsigned i = 0; i < used; ++i) if (memory[i].address == p) return memory[i].value;
+    for (unsigned i = 0; i < used; ++i) if (memory[i].address == p) {
+        if (p == mutate_address && mutate_reads && !--mutate_reads) memory[i].value = mutate_value;
+        return memory[i].value;
+    }
     return 0;
 }
 unsigned byte(U p) { return word(p & ~(U)3) >> ((p & 3) * 8) & 255; }
@@ -72,7 +77,12 @@ static void setup(void)
 {
     used = dispatches = destructions = reflows = reads = try_failure = 0;
     leave_registration = 0; unsafe_node = teardown_failed = requested_fault = reflowing = 0;
+    mutate_address = 0; mutate_reads = mutate_value = 0;
     retired_nodes[0] = retired_nodes[1] = 0; stop_requested = 0;
+    visible = updating = 0;
+    stable = previous_width = previous_box = pending_ticks = 0;
+    pending_percent = shown_percent = -1;
+    original = 0; original_layout = 0;
     paf = 0x08800000; vsh = 0x0a000000; parent = 0x09800000; clock_node = 0x09810000;
     new_node = 0x09820000; shown_node = 0;
     status = (Status){.installed = 1, .desired = 50};
@@ -110,7 +120,7 @@ static void setup(void)
     write_word(clock_node + 0x160, layout_data); write_word(clock_node + 0x164, 1); write_word(clock_node + 0x168, 1);
     write_word(layout_data, 0x2000c); write_word(layout_data + 4, (unsigned)(U)layout_callback);
 }
-int main(void)
+static void test_invalid_membership_and_teardown_latches(void)
 {
     setup(); write_word(parent + 0x1b4, 3);
     assert(occurrences(parent, 0x1b4, new_node) == ~0u);
@@ -125,6 +135,10 @@ int main(void)
     setup(); totals[0] = 6;
     assert(cleanup() == -27 && !new_node);
     assert(cleanup() == -27);
+}
+
+static void test_context_geometry_and_unload(void)
+{
     setup(); bar_nodes[0] = 3; write_word(vsh + 0x5caac, 3);
     assert(reconcile_clock() == -31 && !reflows);
     setup(); write_word(paf + 0x190644, 2);
@@ -133,11 +147,42 @@ int main(void)
     setup(); assert(cleanup() == 0 && destructions == 1 && !status.installed);
     write_word(paf + 0x190640, 0); try_failure = 1; assert(!xmb_can_unload());
     try_failure = 0; assert(xmb_can_unload());
+}
+
+static void test_event_slot_replacement(void)
+{
     setup(); U old = event_slot, head = word(clock_node + 0x1a0), replacement = head + 0x400;
     write_word(head + 4, replacement); write_word(replacement + 4, head);
     write_word(replacement + 8, 100); write_word(replacement + 0x30, (unsigned)(U)callback);
     assert(clock_event_slot((U)(unsigned)(U)callback) == replacement + 0x30);
     assert(old != replacement + 0x30);
+}
+
+static U ready_backend(void)
+{
+    U backend = word(word(new_node + 0x1e8) + 0x1c);
+    write_word(backend + 0x148, 1); write_word(backend + 0x144, 2);
+    write_word(backend + 0x130, fbits(10.2f)); write_word(backend + 0x120, fbits(11));
+    return backend;
+}
+
+static void test_metric_sampling_and_pending_backend(void)
+{
+    setup(); U backend = ready_backend();
+    unsigned width = 0; float box = 0;
+    assert(metrics(new_node, &width, &box) == 1 && width == fbits(10.2f) && box == 11);
+    write_word(backend + 0x188, 1);
+    assert(metrics(new_node, &width, &box) == 0);
+    write_word(backend + 0x188, 0);
+    mutate_address = backend + 0x130; mutate_reads = 2; mutate_value = fbits(12);
+    assert(metrics(new_node, &width, &box) == 0);
+    setup(); backend = ready_backend();
+    mutate_address = backend + 0x148; mutate_reads = 2; mutate_value = 0;
+    assert(metrics(new_node, &width, &box) == 0);
+}
+
+static void test_ready_back_can_wait_for_icon(void)
+{
     setup(); U backend = word(word(new_node + 0x1e8) + 0x1c);
     write_word(backend + 0x148, 1); write_word(backend + 0x144, 2);
     write_word(backend + 0x130, fbits(10.2f)); write_word(backend + 0x120, fbits(10.5f));
@@ -145,6 +190,25 @@ int main(void)
     assert(layout() == 0);
     write_word(backend + 0x120, fbits(11)); assert(layout() == 0);
     assert(layout() == 2 && !dispatches);
+}
+
+static void test_cached_front_recovers_without_new_node(void)
+{
+    setup(); ready_backend();
+    shown_node = new_node; new_node = 0; shown_percent = 50;
+    status.desired = 51; status.native_visible = 1;
+    status.width_bits = fbits(10.2f); status.box_bits = fbits(11);
+    U front = shown_node;
+    assert(recover_cached() == 1 && visible && shown_node == front && !new_node);
+    assert(shown_percent == 50 && status.desired == 51);
+    unsigned previous = dispatches;
+    assert(recover_cached() == 0 && dispatches == previous);
+    assert(hide_text() == 0 && !visible && shown_node == front && !destructions);
+    assert(recover_cached() == 1 && visible && shown_node == front && !destructions);
+}
+
+static void test_install_defers_native_construction(void)
+{
     setup(); destroy_text(new_node); new_node = 0; destructions = 0;
     for (unsigned j = 0; j < 16; ++j) write_word(parent + 0x2a0 + j * 4, fbits(j % 5 == 0 ? 1 : 0));
     const float xs[] = {223, 225, 203}, ys[] = {124, 122, 123};
@@ -157,5 +221,16 @@ int main(void)
     write_word(word(clock_node + 0x160) + 4, vsh + 0x3113c);
     memset(auxiliary_nodes, 0, sizeof(auxiliary_nodes));
     assert(xmb_install() == 0 && !dispatches && !destructions);
+}
+
+int main(void)
+{
+    test_invalid_membership_and_teardown_latches();
+    test_context_geometry_and_unload();
+    test_event_slot_replacement();
+    test_metric_sampling_and_pending_backend();
+    test_ready_back_can_wait_for_icon();
+    test_cached_front_recovers_without_new_node();
+    test_install_defers_native_construction();
     return 0;
 }

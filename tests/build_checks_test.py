@@ -9,55 +9,49 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import check_build as gate
 from prx_libraries import Prx
 from prx_checks import hook_template, symbol_extent, elf_function_bytes
-from tooling_test import fixture
-
-
-class Runtime:
-    name='PSPBatteryRuntime';info_address=0x100;entry=0x200
-    def __init__(self,payload):
-        self.image=bytearray(0x4000)
-        struct.pack_into('<I',self.image,0x100,0xa1000)
-        identity=b'PSPBatteryRuntime release 00030003\0';self.image[0x120:0x120+len(identity)]=identity
-        self.image[0x1000:0x1000+len(payload)]=payload
-        for address,path in ((0xa00,b'flash0:/kd/resource/impose.rsc\0'),(0xb00,b'flash0:/font/ltn8.pgf\0')):
-            self.image[address:address+len(path)]=path
-        self.symbols=dict(battery_vsh_image=0x1000,battery_vsh_image_end=0x1000+len(payload),
-                          home_callback=0x400,home_before=0x600,home_after=0x700,home_original=0x800)
-        words,refs=hook_template()
-        for hi,lo,name in refs:words[lo]|=self.symbols['home_original' if name=='original' else name]
-        self.image[0x400:0x400+len(words)*4]=struct.pack(f'<{len(words)}I',*words)
-        for at in (0x600,0x700):struct.pack_into('<I',self.image,at,0x03e00008)
-        self.records=[];stub=0x3000
-        for name,(version,attribute,nids) in gate.IMPORTS.items():
-            ns=sorted(nids);stubs=list(range(stub,stub+len(ns)*8,8));stub+=len(ns)*8
-            self.records.append(dict(name=name,words=5,version=version,attribute=attribute,
-                                     var_count=0,func_count=len(ns),nids=ns,stubs=stubs))
-        self.system=dict(name='<module-table>',version=0,attribute=0x8000,func_count=2,var_count=1,
-                         nids=[gate.nid('module_start'),gate.nid('module_stop'),gate.nid('module_info')],
-                         addresses=[0x200,0x240,0x100])
-    def imports(self):return self.records
-    def exports(self):return [self.system]
-    def u32(self,at):return struct.unpack_from('<I',self.image,at)[0]
-    def require_range(self,address,size,executable=False):
-        if address<0 or size<0 or address+size>len(self.image):raise ValueError('range')
-        if executable and not (0x200<=address and address+size<=0x900):raise ValueError('executable range')
+from prx_fixture import Runtime, user_prx
 
 
 class IntegratedChecks(unittest.TestCase):
     def setUp(self):
-        self.payload=bytes(fixture());self.child=Prx.parse(self.payload);self.runtime=Runtime(self.payload)
+        self.prepare()
+    def prepare(self, diagnostic=False):
+        self.diagnostic=diagnostic
+        self.payload=bytes(user_prx(diagnostic));self.child=Prx.parse(self.payload)
+        self.runtime=Runtime(self.payload,diagnostic)
     def check(self):
         m=self.runtime
         with patch.object(gate.Prx,'open',return_value=self.child),patch.object(gate,'symbols',return_value=m.symbols), \
              patch.object(gate,'bounded_read',return_value=self.payload), \
              patch.object(gate,'symbol_extent',side_effect=lambda elf,name:(m.symbols[name],4)), \
              patch.object(gate,'elf_function_bytes',return_value=struct.pack('<I',0x03e00008)):
-            return gate.check(Path('runtime'),Path('elf'),Path('payload'),module=m)
-    def test_valid(self):self.assertEqual(self.check(),'release')
-    def test_previous_build_identity_rejected(self):
-        identity=b'PSPBatteryRuntime release 00030001\0'
+            return gate.check(Path('runtime'),Path('elf'),Path('payload'),self.diagnostic,module=m)
+    def test_valid_in_both_modes(self):
+        for diagnostic in (False,True):
+            self.prepare(diagnostic)
+            with self.subTest(diagnostic=diagnostic):
+                self.assertEqual(self.check(),'diagnostic' if diagnostic else 'release')
+    def test_wrong_build_identity_rejected(self):
+        identity=b'PSPBatteryRuntime release deadbeef\0'
         self.runtime.image[0x120:0x120+len(identity)]=identity
         with self.assertRaises(ValueError):self.check()
+
+    def test_dependency_and_mode_boundaries(self):
+        for diagnostic in (False,True):
+            for change in ('extra_write','missing_read','missing_library','logger_marker','timestamp'):
+                self.prepare(diagnostic)
+                io=next(r for r in self.runtime.records if r['name']=='IoFileMgrForKernel')
+                thread=next(r for r in self.runtime.records if r['name']=='ThreadManForKernel')
+                if change=='extra_write':io['nids'].append(0xdeadbeef if diagnostic else 0x42ec03ac);io['func_count']+=1
+                if change=='missing_read':io['nids'].remove(0x6a638d83);io['func_count']-=1
+                if change=='missing_library':self.runtime.records.pop(0)
+                if change=='logger_marker':
+                    path=b'ms0:/SEPLUGINS/battery-level-runtime.log\0'
+                    self.runtime.image[0x900:0x900+len(path)]=bytes(len(path)) if diagnostic else path
+                if change=='timestamp':
+                    if diagnostic:thread['nids'].remove(0x369ed59d);thread['func_count']-=1
+                    else:thread['nids'].append(0x369ed59d);thread['func_count']+=1
+                with self.subTest(diagnostic=diagnostic,change=change),self.assertRaises(ValueError):self.check()
 
     def test_import_and_export_mutations(self):
         original=copy.deepcopy(self.runtime)

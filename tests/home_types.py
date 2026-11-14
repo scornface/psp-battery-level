@@ -2,6 +2,12 @@
 import ctypes
 
 
+class Glyph(ctypes.Structure):
+    _fields_=[('width',ctypes.c_uint),('height',ctypes.c_uint),
+              ('left',ctypes.c_int),('top',ctypes.c_int),('advance',ctypes.c_int),
+              ('pixels',ctypes.c_ubyte*1024)]
+
+
 class Tiles(ctypes.Structure):
     _fields_=[('pixels',(ctypes.c_uint16*240)*11),('left',ctypes.c_uint*11),
               ('right',ctypes.c_uint*11),('ready',ctypes.c_uint)]
