@@ -19,6 +19,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install pinned formatters
+        run: python3 -m pip install -r tools/format-requirements.txt
+
+      - name: Check source formatting
+        run: python3 tools/format.py --check
+
       - name: Run host tests
         run: sh tools/test.sh
 
@@ -27,10 +33,13 @@ jobs:
           sh tools/build.sh release
           python3 tools/check_build.py build/release/battery_level.prx --mode release
 
-      - name: Verify first release against hardware-tested build
-        if: github.ref == 'refs/tags/v0.9' || github.event_name == 'workflow_dispatch'
+      - name: Require explicit hardware-approved release hash for publishing
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          EXPECTED_SHA256: ${{ vars.RELEASE_PRX_SHA256 }}
         run: |
-          echo 'fdac3a2fdce4454b99a0802ddb0fc478ec4ec01098a4ef4c0b7a8a035f52e0c8  build/release/battery_level.prx' | sha256sum --check
+          [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo 'Set RELEASE_PRX_SHA256 only after release hardware validation'; exit 1; }
+          echo "$EXPECTED_SHA256  build/release/battery_level.prx" | sha256sum --check
 
       - name: Package release
         run: |
