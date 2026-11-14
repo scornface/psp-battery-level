@@ -29,13 +29,11 @@ def main() -> None:
     parser.add_argument("--pattern", default="battery|clock|charge|topmenu_plugin")
     parser.add_argument("--context", type=int, default=8)
     args = parser.parse_args()
-    capstone = capstone_module()
-    Cs = capstone.Cs
-    CS_ARCH_MIPS, CS_MODE_MIPS32, CS_MODE_LITTLE_ENDIAN = capstone.CS_ARCH_MIPS, capstone.CS_MODE_MIPS32, capstone.CS_MODE_LITTLE_ENDIAN
-    CS_OP_IMM, CS_OP_REG = capstone.CS_OP_IMM, capstone.CS_OP_REG
-
     if not 0 <= args.context <= 32:
         parser.error("context must be between 0 and 32")
+    capstone = capstone_module()
+    CS_OP_IMM, CS_OP_REG = capstone.CS_OP_IMM, capstone.CS_OP_REG
+
     module = analysis_module(args.prx, args.relocated_image)
     phdrs, image = module.phdrs, module.image
     strings = find_strings(image, re.compile(args.pattern.encode("ascii"), re.IGNORECASE))
@@ -43,14 +41,15 @@ def main() -> None:
         print("no matching strings")
         return
 
-    md = Cs(CS_ARCH_MIPS, CS_MODE_MIPS32 | CS_MODE_LITTLE_ENDIAN)
+    md = capstone.Cs(
+        capstone.CS_ARCH_MIPS, capstone.CS_MODE_MIPS32 | capstone.CS_MODE_LITTLE_ENDIAN
+    )
     md.detail = True
     instructions = []
     for p_type, p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags, p_align in phdrs:
         if p_type == 1 and p_flags & 1:
             for address in range(p_vaddr, p_vaddr + p_filesz - 3, 4):
-                instructions.extend(md.disasm(image[address:address + 4], address))
-    address_to_string = {address: text for address, text in strings.items()}
+                instructions.extend(md.disasm(image[address : address + 4], address))
 
     matches: list[tuple[int, int, bytes]] = []
     for i, insn in enumerate(instructions):
@@ -68,9 +67,12 @@ def main() -> None:
             if low_insn.group(1) or low_insn.group(2) or low_insn.mnemonic in ("jr", "jalr"):
                 break
             if low_insn.mnemonic not in ("addiu", "addi", "ori") or len(low_insn.operands) < 3:
-                if low_insn.mnemonic not in ("sw", "sh", "sb", "swl", "swr", "sdc1", "swc1") \
-                        and low_insn.operands and low_insn.operands[0].type == CS_OP_REG \
-                        and low_insn.operands[0].reg == source_reg:
+                if (
+                    low_insn.mnemonic not in ("sw", "sh", "sb", "swl", "swr", "sdc1", "swc1")
+                    and low_insn.operands
+                    and low_insn.operands[0].type == CS_OP_REG
+                    and low_insn.operands[0].reg == source_reg
+                ):
                     break
                 continue
             if any(op.type != CS_OP_REG for op in low_insn.operands[:2]):
@@ -81,8 +83,8 @@ def main() -> None:
             address = (
                 (high | imm) if low_insn.mnemonic == "ori" else (high + signed16(imm))
             ) & 0xFFFFFFFF
-            if address in address_to_string:
-                matches.append((insn.address, low_insn.address, address_to_string[address]))
+            if address in strings:
+                matches.append((insn.address, low_insn.address, strings[address]))
             if low_insn.operands[0].reg == source_reg:
                 break
 
@@ -95,7 +97,9 @@ def main() -> None:
 
     insn_by_address = {insn.address: index for index, insn in enumerate(instructions)}
     for lui_addr, low_addr, text in matches:
-        print(f"candidate xref {lui_addr:08x}/{low_addr:08x} -> {text.decode('ascii', 'replace')!r}")
+        print(
+            f"candidate xref {lui_addr:08x}/{low_addr:08x} -> {text.decode('ascii', 'replace')!r}"
+        )
         center = insn_by_address[lui_addr]
         start = max(0, center - args.context)
         end = min(len(instructions), insn_by_address[low_addr] + args.context + 1)

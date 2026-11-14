@@ -33,7 +33,9 @@ def sha256(data: bytes) -> str:
 def authenticated_resource(source):
     data = bounded_read(source, 34336)
     if sha256(data) != RCO_SHA256:
-        raise ValueError("Only the authenticated standard Sony 6.61 system_plugin_fg.rco is supported")
+        raise ValueError(
+            "Only the authenticated standard Sony 6.61 system_plugin_fg.rco is supported"
+        )
     return data
 
 
@@ -94,9 +96,7 @@ def decode(source: Path, output: Path) -> None:
     if compression != RCO_COMPRESSION_RLZ:
         raise SystemExit(f"RCO header compression is {compression}, not RLZ (2).")
 
-    packed_size, unpacked_size, longest_text = struct.unpack_from(
-        "<III", rco, RCO_HEADER_SIZE
-    )
+    packed_size, unpacked_size, longest_text = struct.unpack_from("<III", rco, RCO_HEADER_SIZE)
     stream_offset = RCO_HEADER_SIZE + 12
     stream_end = stream_offset + packed_size
     if stream_end > len(rco):
@@ -119,13 +119,9 @@ def decode(source: Path, output: Path) -> None:
     )
     consumed = consumed_ptr.value - ctypes.addressof(in_buffer)
     if result != unpacked_size:
-        raise SystemExit(
-            f"LZR returned {result} bytes; RCO metadata requires {unpacked_size}."
-        )
+        raise SystemExit(f"LZR returned {result} bytes; RCO metadata requires {unpacked_size}.")
     if consumed < 5 or consumed > packed_size:
-        raise SystemExit(
-            f"LZR consumed {consumed} bytes, outside the {packed_size}-byte block."
-        )
+        raise SystemExit(f"LZR consumed {consumed} bytes, outside the {packed_size}-byte block.")
 
     tables = out_buffer.raw[:result]
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -144,7 +140,6 @@ def main() -> None:
     parser.add_argument("input", type=Path, help="source .rco (left unmodified)")
     parser.add_argument("output", type=Path, help="destination for decompressed table block")
     args = parser.parse_args()
-    outputs(args.input, args.output)
     decode(args.input, args.output)
 
 

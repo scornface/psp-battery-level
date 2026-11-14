@@ -63,22 +63,31 @@ class Cursor:
         return struct.unpack("<I", self.take(4))[0]
 
 
-def decode_prx(path: Path, load_base: int) -> tuple[bytearray, list[ProgramHeader], list[str], dict[str, object]]:
+def decode_prx(
+    path: Path, load_base: int
+) -> tuple[bytearray, list[ProgramHeader], list[str], dict[str, object]]:
     if load_base != 0:
         raise ValueError("Only zero-base research images are supported")
     elf = verified_source(path)
     Prx.parse(elf)  # Validate loads, image bounds and ELF identity before allocation.
-    if len(elf) < 52 or elf[:4] != b"\x7fELF":
-        raise ValueError("input is not an ELF file")
-    if elf[4:6] != b"\x01\x01":
-        raise ValueError("expected ELF32 little-endian input")
 
     header = struct.unpack_from("<16sHHIIIIIHHHHHH", elf, 0)
-    _, elf_type, machine, _, entry, phoff, shoff, flags, ehsize, phentsize, phnum, shentsize, shnum, _ = header
-    if machine != 8:
-        raise ValueError(f"expected MIPS machine (8), got {machine}")
-    if phentsize < 32 or phoff + phentsize * phnum > len(elf):
-        raise ValueError("invalid or truncated program-header table")
+    (
+        _,
+        elf_type,
+        _,
+        _,
+        entry,
+        phoff,
+        shoff,
+        flags,
+        _,
+        phentsize,
+        phnum,
+        shentsize,
+        shnum,
+        _,
+    ) = header
 
     phdrs: list[ProgramHeader] = []
     for i in range(phnum):
@@ -88,26 +97,30 @@ def decode_prx(path: Path, load_base: int) -> tuple[bytearray, list[ProgramHeade
     loads = [p for p in phdrs if p.kind == PT_LOAD]
     relocs = [p for p in phdrs if p.kind == PT_PSPREL2]
     if not loads or len(relocs) != 1:
-        raise ValueError(f"expected PT_LOAD and exactly one PT_PSPREL2; got {len(loads)} and {len(relocs)}")
+        raise ValueError(
+            f"expected PT_LOAD and exactly one PT_PSPREL2; got {len(loads)} and {len(relocs)}"
+        )
 
     image_end = max(p.vaddr + p.memsz for p in loads)
     image = bytearray(image_end)
     for p in loads:
-        if p.offset + p.filesz > len(elf) or p.filesz > p.memsz:
-            raise ValueError(f"invalid PT_LOAD segment {p.index}")
         image[p.vaddr : p.vaddr + p.filesz] = elf[p.offset : p.offset + p.filesz]
 
     reloc_segment = relocs[0]
     if reloc_segment.offset + reloc_segment.filesz > len(elf):
         raise ValueError("PT_PSPREL2 segment extends past end of PRX")
-    cur = Cursor(elf[reloc_segment.offset : reloc_segment.offset + reloc_segment.filesz], "PT_PSPREL2")
+    cur = Cursor(
+        elf[reloc_segment.offset : reloc_segment.offset + reloc_segment.filesz], "PT_PSPREL2"
+    )
     if cur.u16() != 0:
         raise ValueError("PT_PSPREL2 reserved prefix is nonzero")
     flag_bits = cur.u8()
     type_bits = cur.u8()
     seg_bits = max(1, (reloc_segment.index - 1).bit_length())
     if not flag_bits or not type_bits or flag_bits + type_bits + seg_bits > 16:
-        raise ValueError(f"invalid Rel2 bit widths: flag={flag_bits} type={type_bits} segment={seg_bits}")
+        raise ValueError(
+            f"invalid Rel2 bit widths: flag={flag_bits} type={type_bits} segment={seg_bits}"
+        )
 
     flag_table_size = cur.u8()
     if not flag_table_size:
@@ -173,7 +186,9 @@ def decode_prx(path: Path, load_base: int) -> tuple[bytearray, list[ProgramHeade
         patch_offset = patch_va - load_base
         selected = next(p for p in loads if p.index == off_segment)
         if rel_base < 0 or rel_base + 4 > selected.memsz or patch_offset & 3:
-            raise ValueError(f"Rel2 command {command_count}: patch address 0x{patch_va:08x} is outside image")
+            raise ValueError(
+                f"Rel2 command {command_count}: patch address 0x{patch_va:08x} is outside image"
+            )
 
         lo_kind = flag & 0x38
         if lo_kind == 0:
@@ -209,7 +224,9 @@ def decode_prx(path: Path, load_base: int) -> tuple[bytearray, list[ProgramHeade
         elif reloc_type in (1, 5):  # LO16 variants
             op = (op & 0xFFFF0000) | ((op + relocate_to) & 0xFFFF)
         else:
-            raise ValueError(f"Rel2 command {command_count}: unsupported relocation type {reloc_type}")
+            raise ValueError(
+                f"Rel2 command {command_count}: unsupported relocation type {reloc_type}"
+            )
 
         struct.pack_into("<I", image, patch_offset, op)
         counts[reloc_type] += 1
@@ -265,7 +282,8 @@ def main() -> None:
         f"PT_PSPREL2=index:{report['reloc_segment_index']} size:0x{report['reloc_segment_size']:x}",
         f"Rel2_bits=flag:{report['rel2_header']['flag_bits']} type:{report['rel2_header']['type_bits']} segment:{report['rel2_header']['segment_bits']}",
         f"commands={report['command_count']} base_commands={report['base_commands']} relocations={len(records)}",
-        "relocations_by_type=" + ", ".join(f"{k}:{v}" for k, v in report["relocations_by_type"].items()),
+        "relocations_by_type="
+        + ", ".join(f"{k}:{v}" for k, v in report["relocations_by_type"].items()),
         "",
         "command\tpatch_va\ttype\toffset_segment\ttarget_segment\tflag\tbefore\tafter",
         *records,
@@ -273,10 +291,17 @@ def main() -> None:
     with args.report.open("x", encoding="utf-8") as output:
         output.write("\n".join(report_lines) + "\n")
     with manifest_path.open("x", encoding="utf-8") as output:
-        output.write(json.dumps({
-            "input_sha256": report["input_sha256"], "image_sha256": hashlib.sha256(image).hexdigest(),
-            "load_base": 0,
-        }, indent=2) + "\n")
+        output.write(
+            json.dumps(
+                {
+                    "input_sha256": report["input_sha256"],
+                    "image_sha256": hashlib.sha256(image).hexdigest(),
+                    "load_base": 0,
+                },
+                indent=2,
+            )
+            + "\n"
+        )
     print("\n".join(report_lines[:9]))
     print(f"image={args.image}")
     print(f"report={args.report}")

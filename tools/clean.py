@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Clean local build intermediates; --all also removes PRX/ELF outputs."""
+
 import argparse
 from pathlib import Path
 
@@ -7,31 +8,40 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def validate_directories():
-    # Only the two known build directories belong to this command. In particular
-    # never walk third-party sources, firmware/evidence, or a mounted console.
+    # Fixed Docker outputs and documented native SDK directories only. Never
+    # recursively walk build/: it also contains private hardware evidence.
     build = ROOT / "build"
-    if build.is_symlink() or (build.exists() and build.resolve().parent != ROOT.resolve()):
+    if build.is_symlink() or build.is_mount() or (build.exists() and not build.is_dir()):
         raise ValueError("Refusing redirected build directory")
-    # Validate both modes before deleting anything; one bad mode must not leave
-    # the other partially cleaned. No symlinked/mounted directory is traversed.
+    directories = []
+    # Validate every directory before deleting anything; a bad native child must
+    # not leave a different mode partially cleaned.
     for mode in ("release", "diagnostic"):
-        directory = build / mode
-        if directory.is_symlink() or directory.is_mount() \
-                or (directory.exists() and directory.resolve().parent != build.resolve()):
-            raise ValueError(f"Refusing redirected build mode: {mode}")
-    if build.is_mount():
-        raise ValueError("Refusing mounted build directory")
+        for child in ("", "kernel", "vsh"):
+            directory = build / mode / child
+            if (
+                directory.is_symlink()
+                or directory.is_mount()
+                or (directory.exists() and not directory.is_dir())
+            ):
+                raise ValueError(f"Refusing redirected build directory: {directory}")
+            directories.append(directory)
+    return directories
 
 
 def clean_builds(all_outputs=False):
-    validate_directories()
-    if any((ROOT / "build" / f".build-{mode}.lock").exists() for mode in ("release", "diagnostic")):
+    directories = validate_directories()
+    locks = [ROOT / "build" / f".build-{mode}.lock" for mode in ("release", "diagnostic")]
+    if any(path.exists() or path.is_symlink() for path in locks):
         raise ValueError("Refusing cleanup while a build lock exists")
-    for mode in ("release", "diagnostic"):
-        directory = ROOT / "build" / mode
+    for directory in directories:
         paths = list(directory.glob("*.o")) + [directory / "exports.c"]
         if all_outputs:
-            paths += [directory / "battery_level.prx", directory / "battery_level.elf", directory / "vsh-payload.prx"]
+            paths += [
+                directory / "battery_level.prx",
+                directory / "battery_level.elf",
+                directory / "vsh-payload.prx",
+            ]
         for path in paths:
             if path.is_file() and not path.is_symlink():
                 path.unlink()
@@ -41,7 +51,9 @@ def clean_builds(all_outputs=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--all", action="store_true", help="Also remove compiled plugin outputs")
-    parser.add_argument("--check-only", action="store_true", help="Validate output directories without deleting")
+    parser.add_argument(
+        "--check-only", action="store_true", help="Validate output directories without deleting"
+    )
     args = parser.parse_args()
     try:
         if args.check_only:

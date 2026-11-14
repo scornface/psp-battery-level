@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check the embedded user/VSH component's dependency boundary and exports."""
+
 import hashlib
 import argparse
 import re
@@ -20,21 +21,44 @@ def check_module(module, expected_mode=None):
     diagnostic = mode == "diagnostic"
     if expected_mode and mode != expected_mode:
         raise ValueError("Unexpected build mode")
-    markers = (b"build_id\0", b"native_layout_calls\0", b"clock_resyncs\0",
-               b"ms0:/SEPLUGINS/battery-level.log\0")
+    markers = (
+        b"build_id\0",
+        b"native_layout_calls\0",
+        b"clock_resyncs\0",
+        b"ms0:/SEPLUGINS/battery-level.log\0",
+    )
     if any((marker in module.image) != diagnostic for marker in markers):
         raise ValueError("Diagnostic code/markers do not match the build mode")
     records = module.imports()
     if len({r["name"] for r in records}) != len(records):
         raise ValueError("Duplicate import library")
     for r in records:
-        expected_attr = 9 if r["name"] == "Kernel_Library" else 0x4008 if r["name"] == "SysMemUserForUser" else 0x4009
-        if r["words"] != 5 or r["version"] or r["attribute"] != expected_attr or r["var_count"] \
-                or len(set(r["nids"])) != r["func_count"]:
+        expected_attr = (
+            9
+            if r["name"] == "Kernel_Library"
+            else 0x4008
+            if r["name"] == "SysMemUserForUser"
+            else 0x4009
+        )
+        if (
+            r["words"] != 5
+            or r["version"]
+            or r["attribute"] != expected_attr
+            or r["var_count"]
+            or len(set(r["nids"])) != r["func_count"]
+        ):
             raise ValueError("Unsupported import attributes/variables/duplicate NIDs")
     imports = {entry["name"]: set(entry["nids"]) for entry in records}
-    allowed = {"KUBridge", "SystemCtrlForUser", "scePower", "sceUsb",
-                "Kernel_Library", "SysMemUserForUser", "ThreadManForUser", "UtilsForUser"}
+    allowed = {
+        "KUBridge",
+        "SystemCtrlForUser",
+        "scePower",
+        "sceUsb",
+        "Kernel_Library",
+        "SysMemUserForUser",
+        "ThreadManForUser",
+        "UtilsForUser",
+    }
     if diagnostic:
         allowed.add("IoFileMgrForUser")
     if module.name != "PSPBatteryLevel" or set(imports) != allowed:
@@ -44,10 +68,20 @@ def check_module(module, expected_mode=None):
         "SystemCtrlForUser": ["sctrlSEGetVersion", "sctrlHENGetVersion", "sctrlHENGetMinorVersion"],
         "scePower": ["scePowerGetBatteryLifePercent", "scePowerIsBatteryExist"],
         "sceUsb": ["sceUsbGetDrvState"],
-        "Kernel_Library": ["sceKernelLockLwMutex", "sceKernelUnlockLwMutex", "sceKernelTryLockLwMutex"],
+        "Kernel_Library": [
+            "sceKernelLockLwMutex",
+            "sceKernelUnlockLwMutex",
+            "sceKernelTryLockLwMutex",
+        ],
         "SysMemUserForUser": ["sceKernelDevkitVersion", "sceKernelTotalFreeMemSize"],
-        "ThreadManForUser": ["sceKernelCreateThread", "sceKernelStartThread", "sceKernelDeleteThread",
-                             "sceKernelWaitThreadEnd", "sceKernelDelayThread", "sceKernelGetThreadId"],
+        "ThreadManForUser": [
+            "sceKernelCreateThread",
+            "sceKernelStartThread",
+            "sceKernelDeleteThread",
+            "sceKernelWaitThreadEnd",
+            "sceKernelDelayThread",
+            "sceKernelGetThreadId",
+        ],
         "UtilsForUser": ["sceKernelDcacheWritebackRange"],
     }
     if diagnostic:
@@ -61,11 +95,17 @@ def check_module(module, expected_mode=None):
     if len(exports) != 1:
         raise ValueError("Expected one system export record")
     export = exports[0]
-    if export["name"] != "<module-table>" or export["attribute"] != 0x8000 or export["version"] \
-            or export["func_count"] != 2 or export["var_count"] != 1 \
-            or set(export["nids"][:2]) != {nid("module_start"), nid("module_stop")} \
-            or export["nids"][2:] != [nid("module_info")] \
-            or export["addresses"][2] != module.info_address or module.u32(module.info_address) & 0xffff:
+    if (
+        export["name"] != "<module-table>"
+        or export["attribute"] != 0x8000
+        or export["version"]
+        or export["func_count"] != 2
+        or export["var_count"] != 1
+        or set(export["nids"][:2]) != {nid("module_start"), nid("module_stop")}
+        or export["nids"][2:] != [nid("module_info")]
+        or export["addresses"][2] != module.info_address
+        or module.u32(module.info_address) & 0xFFFF
+    ):
         raise ValueError("Invalid system start/stop/module-info export categories or identity")
     for address in export["addresses"][:2]:
         if address & 3:
@@ -87,7 +127,9 @@ def main():
     except (OSError, ValueError, struct.error) as exc:
         raise SystemExit(f"PRX validation failed: {exc}") from exc
     detail = "" if mode == "diagnostic" else " (no filesystem imports)"
-    print(f"PRX structure passed: {mode}{detail}, build_id={build_id}, exact import policy and system exports; hardware behavior is separate")
+    print(
+        f"PRX structure passed: {mode}{detail}, build_id={build_id}, exact import policy and system exports; hardware behavior is separate"
+    )
 
 
 if __name__ == "__main__":

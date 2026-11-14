@@ -2,7 +2,7 @@ required-version = "==0.14.5"
 target-version = "py310"
 line-length = 100
 cache-dir = "build/ruff-cache"
-include = ["tests/**/*.py", "tools/format.py"]
+include = ["tests/**/*.py", "tools/**/*.py"]
 
 [format]
 quote-style = "double"

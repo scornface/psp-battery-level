@@ -49,9 +49,7 @@ def main():
     python_options = [] if args.write else ["--check"]
     # Run both checks even when one fails, so a single invocation reports all drift.
     c_result = subprocess.run([clang, *c_options, *c_files], cwd=ROOT)
-    python_result = subprocess.run(
-        [ruff, "format", *python_options, "tests", "tools/format.py"], cwd=ROOT
-    )
+    python_result = subprocess.run([ruff, "format", *python_options, "tests", "tools"], cwd=ROOT)
     return int(bool(c_result.returncode or python_result.returncode))
 
 

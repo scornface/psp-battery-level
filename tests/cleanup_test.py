@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -100,6 +101,56 @@ class CleanupTest(unittest.TestCase):
 
     def test_active_build_lock_preserves_all_outputs(self):
         (self.root / "build/.build-release.lock").mkdir()
+        with self.assertRaises(ValueError):
+            clean.clean_builds(True)
+        self.assertTrue((self.root / "build/release/main.o").exists())
+
+    def test_native_outputs_are_scoped_and_intermediates_separate(self):
+        directories = []
+        for mode in ("release", "diagnostic"):
+            for child in ("kernel", "vsh"):
+                directory = self.root / "build" / mode / child
+                directory.mkdir()
+                directories.append(directory)
+                for name in (
+                    "main.o",
+                    "exports.c",
+                    "battery_level.prx",
+                    "battery_level.elf",
+                    "notes.txt",
+                ):
+                    (directory / name).write_bytes(b"fixture")
+                (directory / "unrelated").mkdir()
+                (directory / "unrelated/custom.o").write_bytes(b"preserve")
+
+        clean.clean_builds()
+        for directory in directories:
+            self.assertEqual(
+                {p.name for p in directory.iterdir()},
+                {"battery_level.prx", "battery_level.elf", "notes.txt", "unrelated"},
+            )
+        clean.clean_builds(True)
+        clean.clean_builds(True)
+        for directory in directories:
+            self.assertEqual({p.name for p in directory.iterdir()}, {"notes.txt", "unrelated"})
+            self.assertEqual((directory / "unrelated/custom.o").read_bytes(), b"preserve")
+        self.assert_preserved()
+
+    def test_native_symlink_or_mount_rejected_before_any_deletion(self):
+        target = self.root / "build/diagnostic/vsh"
+        target.symlink_to(self.root / ".deps", target_is_directory=True)
+        with self.assertRaises(ValueError):
+            clean.clean_builds(True)
+        self.assertTrue((self.root / "build/release/main.o").exists())
+        target.unlink()
+        with patch.object(Path, "is_mount", lambda p: p == target):
+            with self.assertRaises(ValueError):
+                clean.clean_builds(True)
+        self.assertTrue((self.root / "build/release/main.o").exists())
+        self.assert_preserved()
+
+    def test_dangling_lock_is_not_ignored(self):
+        (self.root / "build/.build-diagnostic.lock").symlink_to(self.root / "missing")
         with self.assertRaises(ValueError):
             clean.clean_builds(True)
         self.assertTrue((self.root / "build/release/main.o").exists())

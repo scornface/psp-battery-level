@@ -45,28 +45,40 @@ class Prx:
         relocated = None
         if relocated_image:
             relocated = bounded_read(relocated_image, MAX_IMAGE)
-            manifest = json.loads(bounded_read(relocated_image.with_suffix(relocated_image.suffix + ".json"), 4096))
-            if not isinstance(manifest, dict) or type(manifest.get("load_base")) is not int \
-                    or manifest.get("load_base") != 0 or manifest.get("input_sha256") != hashlib.sha256(elf).hexdigest() \
-                    or manifest.get("image_sha256") != hashlib.sha256(relocated).hexdigest():
+            manifest = json.loads(
+                bounded_read(relocated_image.with_suffix(relocated_image.suffix + ".json"), 4096)
+            )
+            if (
+                not isinstance(manifest, dict)
+                or type(manifest.get("load_base")) is not int
+                or manifest.get("load_base") != 0
+                or manifest.get("input_sha256") != hashlib.sha256(elf).hexdigest()
+                or manifest.get("image_sha256") != hashlib.sha256(relocated).hexdigest()
+            ):
                 raise ValueError("Relocated image manifest does not match source/base/image")
         return cls.parse(elf, path, relocated)
 
     @classmethod
-    def parse(cls, elf: bytes, path: Path = Path("<memory>"), relocated: bytes | None = None) -> "Prx":
+    def parse(
+        cls, elf: bytes, path: Path = Path("<memory>"), relocated: bytes | None = None
+    ) -> "Prx":
         if len(elf) > MAX_IMAGE * 2:
             raise ValueError("ELF file exceeds supported input bound")
         if len(elf) < 52 or elf[:7] != b"\x7fELF\x01\x01\x01":
             raise ValueError(f"{path}: expected ELF32 little-endian PRX")
         header = struct.unpack_from("<16sHHIIIIIHHHHHH", elf)
-        if header[1] != 0xffa0 or header[2] != 8 or header[3] != 1 or header[8] != 52:
+        if header[1] != 0xFFA0 or header[2] != 8 or header[3] != 1 or header[8] != 52:
             raise ValueError(f"{path}: unsupported ELF type/machine/version/header")
         phoff, phentsize, phnum = header[5], header[9], header[10]
-        if phentsize != 32 or not 1 <= phnum <= 16 or phoff < 52 or phoff + phentsize * phnum > len(elf):
+        if (
+            phentsize != 32
+            or not 1 <= phnum <= 16
+            or phoff < 52
+            or phoff + phentsize * phnum > len(elf)
+        ):
             raise ValueError(f"{path}: invalid program-header table")
         phdrs = tuple(
-            struct.unpack_from("<IIIIIIII", elf, phoff + i * phentsize)
-            for i in range(phnum)
+            struct.unpack_from("<IIIIIIII", elf, phoff + i * phentsize) for i in range(phnum)
         )
         loads = [p for p in phdrs if p[0] == PT_LOAD]
         if not loads:
@@ -77,8 +89,14 @@ class Prx:
         ranges = []
         for p in loads:
             _, offset, vaddr, _, filesz, memsz, _, align = p
-            if not memsz or filesz > memsz or offset + filesz > len(elf) or vaddr & 3 \
-                    or align not in (0, 1) and align & (align - 1):
+            if (
+                not memsz
+                or filesz > memsz
+                or offset + filesz > len(elf)
+                or vaddr & 3
+                or align not in (0, 1)
+                and align & (align - 1)
+            ):
                 raise ValueError(f"{path}: invalid PT_LOAD segment")
             if any(vaddr < end and start < vaddr + memsz for start, end in ranges):
                 raise ValueError("Overlapping load segments")
@@ -90,9 +108,7 @@ class Prx:
         else:
             mutable = bytearray(image_size)
             for p in loads:
-                _, offset, vaddr, _, filesz, memsz, _, _ = p
-                if offset + filesz > len(elf) or filesz > memsz:
-                    raise ValueError(f"{path}: invalid PT_LOAD segment")
+                _, offset, vaddr, _, filesz, _, _, _ = p
                 mutable[vaddr : vaddr + filesz] = elf[offset : offset + filesz]
             image = bytes(mutable)
 
@@ -133,10 +149,17 @@ class Prx:
         return module
 
     def require_range(self, address: int, size: int, executable: bool = False) -> None:
-        if size < 0 or address < 0 or not any(
-            p[0] == PT_LOAD and p[2] <= address and size <= (p[4] if executable else p[5])
-            and address - p[2] <= (p[4] if executable else p[5]) - size and (not executable or p[6] & 1)
-            for p in self.phdrs
+        if (
+            size < 0
+            or address < 0
+            or not any(
+                p[0] == PT_LOAD
+                and p[2] <= address
+                and size <= (p[4] if executable else p[5])
+                and address - p[2] <= (p[4] if executable else p[5]) - size
+                and (not executable or p[6] & 1)
+                for p in self.phdrs
+            )
         ):
             raise ValueError(f"{self.name}: unmapped range {address:#x}+{size:#x}")
 
@@ -161,11 +184,16 @@ class Prx:
             if pos + 20 > self.stub_end:
                 raise ValueError(f"{self.name}: truncated import record at 0x{pos:x}")
             self.require_range(pos, 20)
-            nameptr, version, attr, words, var_count, func_count, nidptr, stubptr = struct.unpack_from(
-                "<IHHBBHII", self.image, pos
+            nameptr, version, attr, words, var_count, func_count, nidptr, stubptr = (
+                struct.unpack_from("<IHHBBHII", self.image, pos)
             )
             size = words * 4
-            if words not in (5, 6) or pos + size > self.stub_end or func_count > 4096 or (var_count and words != 6):
+            if (
+                words not in (5, 6)
+                or pos + size > self.stub_end
+                or func_count > 4096
+                or (var_count and words != 6)
+            ):
                 raise ValueError(f"{self.name}: invalid import record length {words} at 0x{pos:x}")
             name = self.cstr(nameptr) if nameptr else "<unnamed>"
             self.require_range(nidptr, func_count * 4)
@@ -193,7 +221,9 @@ class Prx:
             )
             pos += size
         if pos != self.stub_end:
-            raise ValueError(f"{self.name}: import records end at 0x{pos:x}, expected 0x{self.stub_end:x}")
+            raise ValueError(
+                f"{self.name}: import records end at 0x{pos:x}, expected 0x{self.stub_end:x}"
+            )
         return records
 
     def exports(self) -> list[dict[str, object]]:
@@ -228,7 +258,9 @@ class Prx:
             )
             pos += size
         if pos != self.ent_end:
-            raise ValueError(f"{self.name}: export records end at 0x{pos:x}, expected 0x{self.ent_end:x}")
+            raise ValueError(
+                f"{self.name}: export records end at 0x{pos:x}, expected 0x{self.ent_end:x}"
+            )
         return records
 
 
@@ -257,7 +289,9 @@ def main() -> None:
         raise SystemExit(f"error: {exc}") from exc
 
     print(f"module={module.name} gp=0x{module.gp:08x}")
-    print(f"exports=0x{module.ent_top:08x}-0x{module.ent_end:08x} imports=0x{module.stub_top:08x}-0x{module.stub_end:08x}")
+    print(
+        f"exports=0x{module.ent_top:08x}-0x{module.ent_end:08x} imports=0x{module.stub_top:08x}-0x{module.stub_end:08x}"
+    )
     for library in imports:
         print(
             f"\nimport {library['name']} version=0x{library['version']:04x} "
@@ -270,11 +304,18 @@ def main() -> None:
                 if record["name"] == library["name"]:
                     by_nid = {
                         nid: address
-                        for nid, address in zip(record["nids"][:record["func_count"]], record["addresses"][:record["func_count"]])
+                        for nid, address in zip(
+                            record["nids"][: record["func_count"]],
+                            record["addresses"][: record["func_count"]],
+                        )
                     }
                     candidates.append((provider.name, by_nid))
         for i, (nid, stub) in enumerate(zip(library["nids"], library["stubs"])):
-            resolved = [f"{provider}+0x{by_nid[nid]:08x}" for provider, by_nid in candidates if nid in by_nid]
+            resolved = [
+                f"{provider}+0x{by_nid[nid]:08x}"
+                for provider, by_nid in candidates
+                if nid in by_nid
+            ]
             if args.all_import_nids or resolved or i < 20:
                 suffix = " -> " + ", ".join(resolved) if resolved else ""
                 print(f"  {i:03d} NID=0x{nid:08x} stub=0x{stub:08x}{suffix}")
@@ -283,7 +324,10 @@ def main() -> None:
         print("\nprovider export libraries:")
         for provider in providers:
             libraries = [r for r in exports[provider.name] if r["name"] != "<module-table>"]
-            print(f"  {provider.name}: " + ", ".join(f"{r['name']}({r['func_count']}f/{r['var_count']}v)" for r in libraries))
+            print(
+                f"  {provider.name}: "
+                + ", ".join(f"{r['name']}({r['func_count']}f/{r['var_count']}v)" for r in libraries)
+            )
 
 
 if __name__ == "__main__":

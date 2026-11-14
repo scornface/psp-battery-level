@@ -3,6 +3,10 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 MODE=${1:-release}
+if [ "$#" -gt 1 ]; then
+    printf 'Usage: %s [release|diagnostic]\n' "$0" >&2
+    exit 2
+fi
 case "$MODE" in
     release) DIAGNOSTICS=0 ;;
     diagnostic) DIAGNOSTICS=1 ;;

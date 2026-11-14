@@ -1,9 +1,11 @@
 """Explicit scope and filesystem boundaries for optional Sony 6.61 research."""
+
 import hashlib
 import os
 from pathlib import Path
 import sys
 import struct
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -27,14 +29,18 @@ def verified_source(path):
 
 def outputs(input_path, *destinations):
     for directory in (ROOT / "build", ROOT / "build/analysis"):
-        if directory.is_symlink() or directory.is_mount():
+        if (
+            directory.is_symlink()
+            or directory.is_mount()
+            or (directory.exists() and not directory.is_dir())
+        ):
             raise ValueError("Refusing redirected/mounted analysis directory")
     base = (ROOT / "build/analysis").resolve()
     paths = [Path(input_path).resolve()] + [Path(p).resolve() for p in destinations]
     if len(set(paths)) != len(paths):
         raise ValueError("Input/output paths collide")
     for i, path in enumerate(paths):
-        for other in paths[i + 1:]:
+        for other in paths[i + 1 :]:
             if path.exists() and other.exists() and path.samefile(other):
                 raise ValueError("Input/output files alias")
     for path in paths[1:]:
@@ -42,6 +48,17 @@ def outputs(input_path, *destinations):
             raise ValueError("Analysis outputs must be below build/analysis")
         if path.exists() or path.is_symlink():
             raise ValueError(f"Refusing to overwrite analysis output: {path}")
+    # Inspect the requested paths as well as their resolved identities. Resolution
+    # alone would hide symlinked children that point back inside build/analysis.
+    for destination in destinations:
+        requested = Path(destination).absolute()
+        if requested.is_symlink():
+            raise ValueError("Refusing symlinked analysis output")
+        for directory in requested.parents:
+            if directory.is_symlink() or directory.is_mount():
+                raise ValueError("Refusing redirected/mounted analysis output directory")
+            if directory.resolve() == base:
+                break
 
 
 def analysis_module(source, image):
@@ -53,7 +70,9 @@ def external_directory(variable):
     """Resolve an explicit input directory; never infer a sibling lab layout."""
     value = os.environ.get(variable)
     if not value or not value.strip():
-        raise ValueError(f"Set {variable} to the external input directory (see docs/dependencies.md)")
+        raise ValueError(
+            f"Set {variable} to the external input directory (see docs/dependencies.md)"
+        )
     path = Path(value).expanduser()
     if not path.is_absolute():
         raise ValueError(f"{variable} must be an absolute directory path")
@@ -68,14 +87,24 @@ def external_directory(variable):
 def capstone_module():
     directory = external_directory("PSP_CAPSTONE_ROOT")
     sys.path.insert(0, str(directory))
-    import capstone
-    if capstone.__version__ != "5.0.6" or not Path(capstone.__file__).resolve().is_relative_to(directory):
-        raise ValueError("Install Capstone 5.0.6 in PSP_CAPSTONE_ROOT; global packages are not accepted")
+    try:
+        import capstone
+    except ImportError as exc:
+        raise ValueError(
+            "Install Capstone 5.0.6 in PSP_CAPSTONE_ROOT (see docs/dependencies.md)"
+        ) from exc
+
+    if capstone.__version__ != "5.0.6" or not Path(capstone.__file__).resolve().is_relative_to(
+        directory
+    ):
+        raise ValueError(
+            "Install Capstone 5.0.6 in PSP_CAPSTONE_ROOT; global packages are not accepted"
+        )
     return capstone
 
 
 def run(main):
     try:
         main()
-    except (OSError, ValueError, struct.error) as exc:
+    except (OSError, ValueError, struct.error, subprocess.CalledProcessError) as exc:
         raise SystemExit(f"Analysis failed: {exc}") from exc

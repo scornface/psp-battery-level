@@ -5,12 +5,11 @@ import copy
 import struct
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import check_build as gate
-from prx_libraries import Prx
-from prx_checks import hook_template, symbol_extent, elf_function_bytes
+from prx_checks import CompanionElf, hook_template
 from prx_fixture import Runtime, user_prx
 
 
@@ -21,21 +20,23 @@ class IntegratedChecks(unittest.TestCase):
     def prepare(self, diagnostic=False):
         self.diagnostic = diagnostic
         self.payload = bytes(user_prx(diagnostic))
-        self.child = Prx.parse(self.payload)
         self.runtime = Runtime(self.payload, diagnostic)
 
     def check(self):
         m = self.runtime
+        companion = Mock(spec=CompanionElf, symbols=m.symbols)
+        companion.function_extent.side_effect = lambda name: (m.symbols[name], 4)
+        companion.function_bytes.return_value = struct.pack("<I", 0x03E00008)
         with (
-            patch.object(gate.Prx, "open", return_value=self.child),
-            patch.object(gate, "symbols", return_value=m.symbols),
-            patch.object(gate, "bounded_read", return_value=self.payload),
-            patch.object(gate, "symbol_extent", side_effect=lambda elf, name: (m.symbols[name], 4)),
-            patch.object(gate, "elf_function_bytes", return_value=struct.pack("<I", 0x03E00008)),
+            patch.object(gate.CompanionElf, "open", return_value=companion) as open_elf,
+            patch.object(gate, "bounded_read", return_value=self.payload) as read_payload,
         ):
-            return gate.check(
+            result = gate.check(
                 Path("runtime"), Path("elf"), Path("payload"), self.diagnostic, module=m
             )
+            read_payload.assert_called_once_with(Path("payload"), 512 * 1024)
+            open_elf.assert_called_once_with(Path("elf"))
+            return result
 
     def test_valid_in_both_modes(self):
         for diagnostic in (False, True):
@@ -134,10 +135,13 @@ class IntegratedChecks(unittest.TestCase):
             with self.subTest(instruction=i), self.assertRaises(ValueError):
                 self.check()
 
-    def test_companion_extents_are_bounded_and_file_backed(self):
+
+class CompanionChecks(unittest.TestCase):
+    def setUp(self):
         data = bytearray(512)
         data[:7] = b"\x7fELF\x01\x01\x01"
         struct.pack_into("<HHI", data, 16, 2, 8, 1)
+        struct.pack_into("<H", data, 40, 52)
         struct.pack_into("<II", data, 28, 52, 0x120)
         struct.pack_into("<HHHH", data, 42, 32, 1, 40, 3)
         struct.pack_into("<8I", data, 52, 1, 0x100, 0x600, 0x600, 4, 4, 5, 4)
@@ -147,12 +151,77 @@ class IntegratedChecks(unittest.TestCase):
         struct.pack_into("<10I", data, 0x170, 0, 3, 0, 0, 0x1C0, len(names), 0, 0, 1, 0)
         struct.pack_into("<IIIBBH", data, 0x1B0, 1, 0x600, 4, 0x12, 0, 1)
         data[0x1C0 : 0x1C0 + len(names)] = names
-        with patch("prx_checks.bounded_read", return_value=bytes(data)):
-            self.assertEqual(symbol_extent(Path("elf"), "home_after"), (0x600, 4))
-            self.assertEqual(
-                elf_function_bytes(Path("elf"), 0x600, 4), struct.pack("<I", 0x03E00008)
-            )
+        self.data = data
+
+    def test_companion_extents_are_bounded_and_file_backed(self):
+        with patch("prx_checks.bounded_read", return_value=bytes(self.data)) as read:
+            companion = CompanionElf.open(Path("elf"))
+            self.assertEqual(companion.symbols["home_after"], 0x600)
+            self.assertEqual(companion.function_extent("home_after"), (0x600, 4))
+            self.assertEqual(companion.function_bytes(0x600, 4), struct.pack("<I", 0x03E00008))
             with self.assertRaises(ValueError):
-                elf_function_bytes(Path("elf"), 0x600, 8)
+                companion.function_bytes(0x600, 8)
             with self.assertRaises(ValueError):
-                symbol_extent(Path("elf"), "other")
+                companion.function_extent("other")
+            read.assert_called_once_with(Path("elf"), CompanionElf.MAX_SIZE)
+
+    def test_invalid_headers_tables_and_names(self):
+        for offset, layout, value in (
+            (16, "<H", 1),
+            (18, "<H", 0),
+            (40, "<H", 0),
+            (28, "<I", 0xFFFFFFFF),
+            (32, "<I", 0xFFFFFFFF),
+            (44, "<H", 17),
+            (48, "<H", 1025),
+            (42, "<H", 31),
+            (46, "<H", 39),
+            (52 + 4, "<I", 511),
+            (52 + 16, "<I", 5),
+            (0x148 + 16, "<I", 0x1F0),
+            (0x148 + 24, "<I", 3),
+            (0x148 + 36, "<I", 15),
+            (0x170 + 4, "<I", 1),
+            (0x170 + 20, "<I", 0xFFFFFFFF),
+            (0x1B0, "<I", 12),
+        ):
+            data = self.data[:]
+            struct.pack_into(layout, data, offset, value)
+            with self.subTest(offset=offset, value=value), self.assertRaises(ValueError):
+                CompanionElf(data)
+        for length in (0, 51, 80, 0x1C8):
+            with self.subTest(length=length), self.assertRaises(ValueError):
+                CompanionElf(self.data[:length])
+        data = self.data[:]
+        data[0x1CB] = ord("x")
+        with self.assertRaises(ValueError):
+            CompanionElf(data)
+
+    def test_duplicate_function_and_conflicting_global_symbols(self):
+        # Reuse the null symbol slot to keep the fixture's section extents fixed.
+        data = self.data[:]
+        data[0x1A0:0x1B0] = data[0x1B0:0x1C0]
+        with self.assertRaisesRegex(ValueError, "ambiguous helper"):
+            CompanionElf(data).function_extent("home_after")
+        struct.pack_into("<I", data, 0x1A4, 0x604)
+        with self.assertRaisesRegex(ValueError, "Ambiguous symbol"):
+            CompanionElf(data)
+
+    def test_helper_cannot_use_bss_nonexecutable_or_ambiguous_segments(self):
+        for flags, filesz, count in ((4, 4, 1), (5, 0, 1), (5, 4, 2)):
+            data = self.data[:]
+            struct.pack_into("<I", data, 52 + 16, filesz)
+            struct.pack_into("<I", data, 52 + 24, flags)
+            struct.pack_into("<H", data, 44, count)
+            if count == 2:
+                data[84:116] = data[52:84]
+            with (
+                self.subTest(flags=flags, filesz=filesz, count=count),
+                self.assertRaises(ValueError),
+            ):
+                CompanionElf(data).function_bytes(0x600, 4)
+
+    def test_snapshot_does_not_follow_mutation_of_input(self):
+        companion = CompanionElf(self.data)
+        self.data[0x100] ^= 1
+        self.assertEqual(companion.function_bytes(0x600, 4), struct.pack("<I", 0x03E00008))
