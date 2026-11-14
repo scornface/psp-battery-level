@@ -7,10 +7,15 @@
 #define BATTERY_DIAGNOSTICS 0
 #endif
 #if BATTERY_DIAGNOSTICS
-#define DIAG(...) do { __VA_ARGS__; } while (0)
+#define DIAG(...)                                                                                  \
+    do {                                                                                           \
+        __VA_ARGS__;                                                                               \
+    } while (0)
 #define BUILD_ID_TOKEN 0001000b
 #else
-#define DIAG(...) do { } while (0)
+#define DIAG(...)                                                                                  \
+    do {                                                                                           \
+    } while (0)
 #define BUILD_ID_TOKEN 0001000a
 #endif
 #define BUILD_NUMBER_(token) 0x##token##u

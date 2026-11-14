@@ -1,0 +1,33 @@
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: Never
+  AfterStruct: false
+  AfterEnum: false
+  AfterUnion: false
+  BeforeElse: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+SeparateDefinitionBlocks: Always
+SortIncludes: Never
+IncludeBlocks: Preserve
+InsertBraces: false
+RemoveBracesLLVM: false
+ReflowComments: Never
+AlignAfterOpenBracket: Align
+BinPackArguments: false
+BinPackParameters: false
+PenaltyReturnTypeOnItsOwnLine: 1000000
+PointerAlignment: Right
+# DIAG accepts statements, not an expression. Preserve its manual line breaks.
+WhitespaceSensitiveMacros: [DIAG]

@@ -1,6 +1,7 @@
 /* An ungranted/nested invocation must not consume another frame's token. */
 #include <assert.h>
 #include "refresh_policy.h"
+
 int main(void)
 {
     HomeRefreshState refresh = {0};

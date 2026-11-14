@@ -48,7 +48,8 @@ static void test_cached_recovery(void)
 static void test_usb_wait_budget(void)
 {
     unsigned ticks = 0;
-    for (unsigned i = 0; i < 9; ++i) assert(!update_wait_expired(0, 0, &ticks));
+    for (unsigned i = 0; i < 9; ++i)
+        assert(!update_wait_expired(0, 0, &ticks));
     /* USB pause resets the nearly exhausted wait budget. */
     for (unsigned i = 0; i < 120; ++i) {
         assert(!update_wait_expired(1, 0, &ticks));
@@ -58,7 +59,8 @@ static void test_usb_wait_budget(void)
     assert(!update_wait_expired(0, 1, &ticks));
     assert(ticks == 0);
     assert(!update_wait_expired(0, 2, &ticks));
-    for (unsigned i = 0; i < 9; ++i) assert(!update_wait_expired(0, 0, &ticks));
+    for (unsigned i = 0; i < 9; ++i)
+        assert(!update_wait_expired(0, 0, &ticks));
     assert(update_wait_expired(0, 0, &ticks));
 }
 

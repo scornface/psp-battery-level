@@ -4,6 +4,7 @@
 #include <stddef.h>
 typedef int SceUID;
 typedef unsigned SceSize;
+
 typedef struct {
     unsigned size;
     int mpidtext, mpiddata;
@@ -11,14 +12,16 @@ typedef struct {
     unsigned char position, access;
     unsigned short reserved;
 } SceKernelLMOption;
+
 typedef struct {
     unsigned attribute;
     char modname[28];
     unsigned nsegment, segmentaddr[4], segmentsize[4], text_addr, text_size;
 } SceModule;
+
 #define PSP_MEMORY_PARTITION_USER 2
 #define PSP_SMEM_Low 0
-#define PSP_MODULE_INFO(a,b,c,d)
+#define PSP_MODULE_INFO(a, b, c, d)
 SceUID sceKernelLoadModuleBufferForKernel(SceSize, void *, int, SceKernelLMOption *);
 int sceKernelStartModule(int, unsigned, void *, int *, void *);
 int sceKernelStopModule(int, unsigned, void *, int *, void *);

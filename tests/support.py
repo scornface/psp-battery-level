@@ -1,4 +1,5 @@
 """Small host build helpers; never select PSP, firmware or mounted-device inputs."""
+
 import os
 from pathlib import Path
 import subprocess
@@ -40,5 +41,19 @@ def run_program(binary, *arguments):
 def compile_library(output, *sources):
     # ctypes loads into an ordinary Python process, not an ASan executable.
     # Sanitizer coverage belongs to standalone C harnesses using compile_program.
-    subprocess.run([os.environ.get("CC", "cc"), "-std=c99", "-O2", "-Wall", "-Wextra",
-                    "-Werror", "-shared", "-fPIC", *map(str, sources), "-o", str(output)], check=True)
+    subprocess.run(
+        [
+            os.environ.get("CC", "cc"),
+            "-std=c99",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-shared",
+            "-fPIC",
+            *map(str, sources),
+            "-o",
+            str(output),
+        ],
+        check=True,
+    )

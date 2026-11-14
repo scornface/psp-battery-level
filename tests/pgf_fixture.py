@@ -1,4 +1,5 @@
 """Construct tiny revision-2 PGFs from explicit synthetic coverage runs."""
+
 import struct
 
 
@@ -15,8 +16,16 @@ def glyph(width=1, height=1, order=1, runs=None, advance_index=None, advance=64)
             position += 1
 
     flags = order | (32 if advance_index is not None else 0)
-    for value, count in ((0, 14), (width, 7), (height, 7), (0, 7), (1, 7),
-                         (flags, 6), (0, 7), (0, 9)):
+    for value, count in (
+        (0, 14),
+        (width, 7),
+        (height, 7),
+        (0, 7),
+        (1, 7),
+        (flags, 6),
+        (0, 7),
+        (0, 9),
+    ):
         put(value, count)
     for _ in range(3):
         put(0, 32)
@@ -39,7 +48,7 @@ def glyph(width=1, height=1, order=1, runs=None, advance_index=None, advance=64)
                 put(coverage, 4)
     length = len(record)
     record[0] = length & 255
-    record[1] = (record[1] & 0xc0) | (length >> 8)
+    record[1] = (record[1] & 0xC0) | (length >> 8)
     header = bytearray(392)
     struct.pack_into("<H", header, 2, 392)
     header[4:8] = b"PGF0"

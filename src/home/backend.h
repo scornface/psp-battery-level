@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef HOME_BACKEND_H
 #define HOME_BACKEND_H
+
 typedef struct {
     unsigned published, fault, fault_site, drawn, restores, captures;
     unsigned retired, conflicts, presented, suspended, percent, width;
 } HomeStatus;
+
 /* Bootstrap's single kernel worker owns preparation, discovery and polling.
  * poll is diagnostic-only, invoked on the worker outside exclusion. A zero
  * return does not authorize unload: hook publication is the lifetime boundary. */

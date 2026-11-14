@@ -8,10 +8,12 @@
 #include <stdint.h>
 typedef uintptr_t U;
 extern U paf, vsh;
+
 typedef struct {
     int paf_query, vsh_query;
     unsigned paf_base, vsh_base, paf_size, vsh_size, checks;
 } NativeDiscovery;
+
 /* Worker discovery publishes paf/vsh only after every descriptor/range check.
  * info is optional and receives diagnostic results even on discovery failure. */
 int native_discover(NativeDiscovery *info);
@@ -23,13 +25,46 @@ unsigned word(U p);
 unsigned byte(U p);
 void write_word(U p, unsigned value);
 #else
-static inline unsigned word(U p) { return *(volatile unsigned *)p; }
-static inline unsigned byte(U p) { return *(volatile unsigned char *)p; }
-static inline void write_word(U p, unsigned value) { *(volatile unsigned *)p = value; }
+static inline unsigned word(U p)
+{
+    return *(volatile unsigned *)p;
+}
+
+static inline unsigned byte(U p)
+{
+    return *(volatile unsigned char *)p;
+}
+
+static inline void write_word(U p, unsigned value)
+{
+    *(volatile unsigned *)p = value;
+}
 #endif
-static inline U slot(U n, unsigned offset) { return word(word(n) + offset); }
-static inline unsigned fbits(float f) { union { float f; unsigned b; } u = {.f = f}; return u.b; }
-static inline float from_bits(unsigned b) { union { float f; unsigned b; } u = {.b = b}; return u.f; }
+static inline U slot(U n, unsigned offset)
+{
+    return word(word(n) + offset);
+}
+
+static inline unsigned fbits(float f)
+{
+    union {
+        float f;
+        unsigned b;
+    } u = {.f = f};
+
+    return u.b;
+}
+
+static inline float from_bits(unsigned b)
+{
+    union {
+        float f;
+        unsigned b;
+    } u = {.b = b};
+
+    return u.f;
+}
+
 /* Callers validate object identity/ownership before these thin ABI adapters.
  * destroy_text invokes Sony's complete destructor/free; never free it again. */
 void position(U n, const float v[4]);

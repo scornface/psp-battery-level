@@ -2,6 +2,7 @@
 #ifndef HOME_POWER_WORKER_H
 #define HOME_POWER_WORKER_H
 #include "power_frames.h"
+
 typedef struct {
     int exists, percent, preparation, publication;
     unsigned generation;
