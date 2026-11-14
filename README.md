@@ -2,8 +2,6 @@
 
 An ARK-4 plugin that shows **0%–100% beside the battery icon** in the XMB and the HOME menu opened during a game. It keeps the original clock and charging animation and adjusts the layout to the percentage's width.
 
-![PSP XMB showing the battery percentage](docs/screenshots/xmb.png)
-
 ## Compatibility
 
 Tested on **PSP-2004, Sony 6.61, ARK-4 4.20.69 r206, with the standard theme**. Other configurations are not verified, and the plugin refuses unsupported models and ARK API versions. Do not bypass these checks.
@@ -33,6 +31,16 @@ Release packages contain the ready-to-install `battery_level.prx`, this README a
 Install only `battery_level.prx`; the build's ELF and user payload are not additional plugins. Do not enable it for POPS. No further runtime settings are required.
 
 To disable or uninstall, disable/remove both entries and reboot. You can then delete the PRX. Do not unload the plugin from a running game.
+
+## Screenshots
+
+### XMB
+
+![PSP XMB showing the battery percentage](docs/screenshots/vsh.png)
+
+### GAME HOME
+
+![PSP GAME HOME showing the battery percentage](docs/screenshots/game.png)
 
 ## Troubleshooting
 
