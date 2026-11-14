@@ -1,148 +1,98 @@
-# Plugin architecture
+# Architecture
 
-The plugin adds a Sony PAF `Text` next to the battery. It does not draw to the
-framebuffer, replace the clock string, or control Sony's charging animation.
-The verified target is PSP-2004, Sony 6.61, ARK-4 4.20.69 r206, standard theme.
+The installed kernel PRX selects one backend for its execution context: a user-mode XMB component in VSH, or a kernel Impose backend in GAME HOME. POPS is rejected. The backends do not share renderer state, native pointers, synchronization or teardown.
 
 ## Source map
 
 | Component | Responsibility |
 | --- | --- |
-| `src/main.c` | Module lifecycle, environment checks, readiness retries, 1 Hz power sampling |
-| `src/xmb.c` | Clock hooks, native Text ownership, measured layout, recovery and teardown |
-| `src/native.c`, `native.h` | Module discovery, memory/signature guards, Sony ABI calls and style |
-| `src/diagnostics.c`, `diagnostics.h` | Optional snapshot logger; absent from release |
-| `src/xmb.h` | Internal shared-state and worker/controller contract |
-| `src/*_policy.h` | Small platform-independent layout/recovery/timeout decisions |
-| `src/abi.S` | Move scalar float argument bits into Sony's expected `f12` register |
-| `src/ark-imports.S` | ARK KUBridge/SystemCtrl import stubs |
+| `src/bootstrap/main.c`, `context.h` | Environment checks, context selection and parent lifecycle |
+| `src/bootstrap/vsh.c` | Loading and owning the embedded user module |
+| `src/vsh/main.c` | VSH worker, discovery, readiness retries and power sampling |
+| `src/vsh/xmb.c`, `xmb.h` | Native Text ownership, callback-driven layout, recovery and cleanup |
+| `src/vsh/native.c`, `native.h` | Module discovery, memory/signature guards, Sony calls and style |
+| `src/vsh/*_policy.h` | Pure layout, recovery and timeout decisions |
+| `src/vsh/abi.S`, `ark-imports.S` | Sony scalar-float ABI adapter and ARK import stubs |
+| `src/home/backend.c`, `callback.c`, `hook.S` | GAME worker, native guards and pre/Sony/post callback wrapper |
+| `src/home/bar_*.h`, `binding_policy.h` | Strip geometry, transfers and pixel ownership |
+| `src/home/assets.c`, `pgf.c`, `sprite.c` | Asset authentication, bounded font decoding and sprite preparation |
+| `src/home/power_worker.c`, `power_frames.h` | Power sampling and two-frame publication |
+| `src/bootstrap/diagnostics.c`, `src/vsh/diagnostics.c` | Optional worker-side logging |
 
-## Execution and ownership
+`src/vsh/Makefile` builds the user payload independently. `src/bootstrap/Makefile` embeds it and links the GAME backend into the installed PRX. Each module owns its exports.
 
-The worker discovers PAF/VSH through KUBridge, validates the environment and
-module signatures, and retries UI readiness for up to 30 seconds per phase.
-Installation validates the standard page, geometry and both event slots before
-writing either hook. Text construction is deferred to Sony's callback.
+Read `bootstrap/main.c` and `bootstrap/vsh.c` first, then follow the selected backend. `home/backend.h` is the bootstrap-facing GAME interface; `home/backend_internal.h` is private to that backend. `vsh/xmb.h` is not a cross-backend API.
 
-Once installed, the worker updates `status.desired` and copies diagnostic state
-under the native PAF lightweight mutex. Power calls and logging are outside
-that lock. Only verified clock callbacks create, style, reposition or destroy
-native nodes. Both original Sony callbacks always run first.
+## Bootstrap and module ownership
 
-The clock update hook uses event 100. The size/layout hook uses event `0x2000c`.
-Native reflow can trigger the latter recursively; `reflowing` prevents applying
-our correction again inside our own reflow.
+The bootstrap checks the model, firmware, key configuration and ARK API versions before selecting a backend. Version checks alone are insufficient: each backend must also validate the native code and objects it uses. Exact interfaces are documented in [native analysis](analysis.md).
 
-## Text update state machine
+In VSH, the bootstrap loads the embedded PRX into user memory partitions. It owns that module even if startup partially fails. Parent unload requires successful child stop and unload; a loaded child must never be abandoned on a failure path.
 
-`shown_node` is the committed front; `new_node` is the reusable back. At most
-two Text nodes are created. An update sets the back's UTF-16 string and waits
-for Sony to process it, keeping the old front visible.
+In GAME, the bootstrap worker runs the HOME backend. Hook publication and parent stop use the same interrupt exclusion. Once the hook is published, unload is refused without stopping the active renderer. A failed or stopped instance must be unloaded and freshly loaded, not restarted with stale state.
 
-The backend supplies fractional glyph width and a rounded native box. Commit
-requires valid backend flags and two identical width/box samples. The layout uses
-`shift = box + 7`, with the text right anchor at X=236. Battery and shadow move
-from their captured baseline; the clock is repositioned through Sony's reflow
-routine, which also places hold/mute icons. Swapping visibility and geometry
-occurs under the same lock.
+## VSH backend
 
-Readiness flags bracket repeated width/box reads. This rejects observed changes,
-but does not prove Sony's backend publication protocol; hardware validation is
-still required. Node addresses, vtables, parent/vector ownership and backend
-identity are validated before virtual calls, including teardown.
+### Installation and callback context
 
-Never accumulate shifts from the live coordinates. Sony can reset the clock
-when its date/time size changes; recognize only the verified reset positions
-and reapply the current shift from an unshifted baseline.
+The VSH worker discovers PAF/VSH through KUBridge, checks module signatures and retries readiness for up to 30 seconds per startup phase. Installation validates the standard page, baseline geometry and both event slots before writing either hook. Text construction waits for a verified Sony callback.
 
-## Recovery and USB
+The worker publishes the desired percentage and copies diagnostic state under the native PAF lightweight mutex. Power calls and file I/O remain outside it. Only verified callbacks create, style, reposition or destroy native nodes. Both original Sony callbacks run first.
 
-Invalid power samples or a hidden battery Plane hide the percentage and restore
-the bar. The front retains its string and measured box. Once valid again, the
-callback can restore it without setting the string or repeating metric warmup.
-A changed desired percentage prepares a new back while the cached front stays
-visible. A ready back can wait for the icon without consuming a timeout.
+The clock update event is 100; the size/layout event is `0x2000c`. Sony's reflow can invoke the layout callback recursively. The `reflowing` guard prevents applying the correction again during that nested call.
 
-The Plane flag does not represent page-level visibility. USB storage hides the
-indicator page and can suspend text preparation while that flag remains set.
-Each update callback directly queries `USBStor_Driver`; started (1) pauses
-preparation/commit and clears the metric wait budget and stability samples.
-Existing nodes remain intact. On exit, normal preparation resumes. Outside USB,
-ten non-ready attempts still fault instead of waiting indefinitely.
+### Text and layout
 
-## Failure and unload
+`shown_node` is the visible front and `new_node` is the reusable back. At most two Text nodes exist. A percentage change sets the back's UTF-16 string and waits for Sony to prepare it while the front remains visible.
 
-Topology, vtables, callback ownership and expected geometry are checked before
-native operations. Failure requests guarded cleanup; unexpected ownership or a
-partially constructed object prevents unsafe destruction.
+Commit requires valid backend flags and two identical width/box samples. Readiness flags bracket repeated metric reads to reject observed changes; this does not establish Sony's complete publication protocol. Node ranges, vtables, parent/vector membership and backend identity are checked before native calls, including destruction.
 
-Cleanup restores geometry, destroys owned Text nodes, verifies original child
-counts and restores both callbacks. `module_stop` requests this work instead
-of performing it on a foreign thread. It waits up to three seconds and refuses
-unload if the worker, hooks or nodes are still active. The thread-end handshake
-adds at most 100 ms. A try-lock waits out active foreign callbacks without blocking
-unload indefinitely; recursive unload from the PAF owner is refused.
-Destruction failures retain a teardown latch/retired-address tokens and prevent
-subsequent false success or double destruction. Such unsafe failures require a
-reboot; they are not repaired by blindly retrying native operations.
+Layout uses the measured native box: `shift = box + 7`, with the percentage's right anchor at X=236. Battery and shadow move from captured baseline positions. Sony's reflow routine positions the clock and hold/mute icons. Geometry and front/back visibility change under the same lock.
 
-Worker lock failures and callbacks lacking a verified context publish only a
-single-word deferred request; a later verified callback records it (diagnostic
-stage 7) and cleans up. The latest deferred code wins; first synchronized fault
-details remain latched. The periodic event slot is re-resolved each time.
+Never subtract a shift from already shifted coordinates. Sony can reset the clock during date/time size changes; recognize only the verified reset positions and reapply the current shift from baseline.
 
-Important outcomes: -2 module/signature mismatch; -12 unsupported environment;
--20 callback context mismatch; -21 allocation preflight/allocation failure;
--22 unexpected constructed vtable; -23 child registration mismatch;
--24 style failure; -25 invalid percentage/setter failure; -26 hook ownership;
--27 teardown child-count mismatch; -30 unsupported initial geometry/topology;
--31 unexpected live geometry; -32 restoration mismatch; -33 metric timeout;
--34 unsafe Text membership. Discovery/readiness also use -1/-3/-4/-5/-7/-8/-9/
--10/-11 for module, lock, object and event checks.
+### Recovery and USB
 
-## Release and diagnostics
+Invalid power samples or a hidden battery Plane hide the percentage and restore the bar. The front retains its string and metrics so it can be restored without setting the string or waiting for font preparation again. A changed percentage prepares a new back while that cached front remains visible.
 
-Default: `sh tools/build.sh` (or `sh tools/build.sh release`). Optional logging:
-`sh tools/build.sh diagnostic`. Docker builds use the pinned PSPDEV image;
-direct SDK out-of-source builds are documented in [dependencies.md](dependencies.md).
+The Plane visibility flag does not indicate whether its page is visible. USB storage can hide the page and suspend preparation while leaving the flag set. The update callback queries `USBStor_Driver`; state 1 pauses preparation/commit and clears the metric wait budget and stability samples. Nodes remain allocated. Normal preparation resumes after USB; outside USB, ten non-ready attempts cause a fault. A ready back waiting for the icon does not consume that timeout.
 
-All outputs are built directly in `build/release/` and `build/diagnostic/`;
-`src/` contains only source/build definitions. Mode switches rebuild all objects,
-because the shared-state layout differs between modes.
+### Failure and cleanup
 
-Release excludes diagnostic code, buffers, counters, timestamps and charging/AC
-sampling. It imports no filesystem services. Required geometry caches, failure
-handling, the power sampler and callback USB gate remain active. An offline
-identity string identifies the PRX without a log: release `0001000a`, diagnostic
-`0001000b`, module version 0.9. Numeric/text IDs derive from one token.
+Guard failures request cleanup in a verified callback rather than invoking native operations from an arbitrary thread. Lock failures and callbacks without a verified context publish only a single-word deferred request. The next valid callback records the request and performs cleanup; synchronized fault details remain latched. The periodic event slot is resolved again on each callback.
 
-Diagnostic logging uses `ms0:/SEPLUGINS/battery-level.log`, hexadecimal fields,
-at most 128 ordinary change snapshots per VSH session plus a terminal snapshot.
-USB state is checked before writing and suppressed snapshots are retried later.
-These checks are best-effort transition gating, not a USB/filesystem exclusion
-lock. A newly started logging session truncates the previous file; archive a
-trial before reboot/game launch. I/O uses copies,
-never native pointers, outside the lock. Snapshot timestamps are not display
-frame measurements. Parse with `python3 tools/summarize_log.py --power LOG`.
+Cleanup restores baseline geometry, destroys owned Text nodes, checks the original child counts and restores both callbacks. Uncertain ownership or a partially constructed object prevents destruction. A teardown latch and retired-address tokens prevent double destruction or a later false report of success.
 
-## Verification
+VSH stop waits up to three seconds for worker/cleanup completion and uses a bounded thread-end handshake. The unload check uses a try-lock and refuses recursive unload from the PAF owner. Remaining workers, hooks, nodes or teardown faults prevent unload; unsafe native failures require a reboot.
 
-Run `sh tools/test.sh` for C99 policy checks (`-Wall -Wextra -Werror`) and scoped
-controller/guard tests and Python mutation/boundary tests. Build both modes and
-run `tools/check_build.py` on their PRX files: bounded ELF ranges, exact import
-NIDs/attributes, no variable/duplicate imports, mode identity and typed system
-exports. Function/stub targets must be executable file-backed ranges. A checker
-pass is structural evidence, not proof of correct rendering or unloading.
+## GAME HOME backend
 
-Host checks cannot validate Sony's renderer. Hardware checks cover startup,
-percentage changes, date/time reflow, USB with changed percentage, standby and
-return from a game. Stage a distinct versioned filename, compare bytes/hash and
-imports, change only the resident plugin line, sync and reboot directly. For
-release, verify the offline identity and file hash before/after the trial;
-there is intentionally no runtime log identifying execution.
+### Startup and callback wrapper
 
-Hardware compatibility is limited to the target listed at the top of this
-document. Host checks and structural PRX validation do not establish behavior on
-other hardware, firmware, themes, or every unload path. For deployment, compare
-the release PRX with its build, preserve other plugins, enable only one resident
-copy, and reboot directly into the target environment.
+Startup reads only `flash0:/kd/resource/impose.rsc` and `flash0:/font/ltn8.pgf`. Both files have bounded reads and exact size/hash checks before decoding. Scratch storage is reclaimed after preparing owned assets. Missing or mismatched inputs prevent hook installation; there is no replacement font, bundled Sony asset or fallback overlay.
+
+Installation requires all 175 instruction/relocation guards, expected module ranges and the one-block FPL allocation with its exact cached/uncached aliases. The wrapper preserves Sony's arguments and results around integer-only pre/post helpers. A per-invocation token pairs granted pre/post phases; nested or expired calls cannot consume another invocation's work.
+
+Only verified callbacks under CPU interrupt exclusion access the native strip at x=250..477, y=5..21. Interrupt exclusion does not make display scanout atomic. Callbacks perform no file I/O, power calls, allocation or glyph preparation.
+
+### Pixel ownership and recovery
+
+`canonical` stores the unmodified Sony strip; `presentation` stores the last plugin output. Clean callbacks access no pixels. Power-only changes first compare the complete old presentation, then compose from canonical pixels. They never shift an already shifted image.
+
+Before Sony performs a partial battery update, restore the canonical strip only when the binding, boundary and entire old presentation match. A verified native full rebuild needs no stale restoration because it clears the owned strip itself.
+
+Suspension retains ownership of any residual output. Recovery must precede both the wait gate and Sony's partial update. It requires the same binding/boundary and complete pixel equality; a mismatch forbids writing. Only verified restoration or completion of a native full clear discharges that ownership. A rejected scene or an incomplete rebuild does not.
+
+### Sprites and power publication
+
+Sprites preserve the original digits and 11×11 `%`, with a compact shadow and one blank bright column between digits and percent. Width includes the shadow. Composition uses `shift = width + 4` and `percent_x = 478 - width`; date/time and battery move together from canonical pixels. Old tails are cleared within the same strip. Accepted native-left boundaries remain 301..450.
+
+Sony retains control of animations and cache scheduling. The plugin does not force redraws or store native cache flags.
+
+The worker normally samples power once per second and prepares the inactive of two owned frames. Interrupt exclusion covers front-index/validity publication and the callback's entire front read; no pointer survives that read. Invalid power publishes invalidity instead of clamping or inventing a percentage. Workers never write Sony pixels, and logging budgets do not limit rendering or sampling lifetime.
+
+## Development boundaries
+
+Keep pure policies independent of PSP services. Share operations within a backend when their ownership contracts match, but do not merge PAF locking, interrupt exclusion or teardown into a generic controller. Repeated volatile readiness reads are intentional. Keep measured offsets numeric when their meaning is not established rather than inventing Sony field names.
+
+Build, diagnostics, testing and release procedures are in [development](development.md). Host tests and structural checks cannot establish correct Sony rendering, scanout behavior or every unload path.

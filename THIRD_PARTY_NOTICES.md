@@ -1,13 +1,12 @@
 # Third-party notices
 
-The plugin's original code is MIT-licensed; distribute `LICENSE` and this file
-with PRX packages. Calling ARK/Sony runtime APIs does not bundle their firmware.
+The plugin's original code is MIT-licensed. Include `LICENSE` and this file with PRX packages. Calling ARK/Sony runtime APIs does not bundle their firmware.
 
 ## PSPSDK import/header infrastructure
 
-Source: <https://github.com/pspdev/pspsdk/blob/master/LICENSE>.
-The pinned PSPDEV build uses PSPSDK headers, export/import generation and stubs.
+The PSPDEV build uses PSPSDK headers, export/import generation and stubs. [Upstream license](https://github.com/pspdev/pspsdk/blob/master/LICENSE):
 
+```text
 Copyright (c) 2005  adresd
 Copyright (c) 2005  Marcus R. Brown
 Copyright (c) 2005  James Forshaw
@@ -36,18 +35,15 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
 
 ## Optional host research, not part of the PRX
 
 - pspdecrypt 1.0: GPLv3, with additional component notices in its source tree.
-- libLZR 0.11: BenHur, **CC BY-SA 3.0**, as stated in `libLZR.c/.h`;
-  <https://creativecommons.org/licenses/by-sa/3.0/>. The project's wrapper does
-  not relicense it. Decoder products and the patched RCOMage binary remain local.
-- RCOMage: ZiNgA BuRgA / Youness Alaoui, LGPL-2.1 notices; the maintained patch
-  retains those terms and introduces the separately licensed libLZR dependency.
+- libLZR 0.11: BenHur, [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/), as stated in `libLZR.c/.h`. The project's wrapper does not relicense it. Decoder products and the patched RCOMage binary remain local.
+- RCOMage: ZiNgA BuRgA / Youness Alaoui, LGPL-2.1 notices; the maintained patch retains those terms and introduces the separately licensed libLZR dependency.
 - Capstone 5.0.6: retain its BSD notices and component licenses in the package.
 
-The Python Rel2 research reader cites PPSSPP's format/algorithm as its reference.
-No PPSSPP library is linked into the PRX.
-Reference: <https://github.com/hrydgard/ppsspp/blob/master/Core/ELF/ElfReader.cpp>.
+The Python Rel2 reader uses [PPSSPP's format/algorithm](https://github.com/hrydgard/ppsspp/blob/master/Core/ELF/ElfReader.cpp) as a reference. No PPSSPP library is linked into the PRX.
+
 These statements do not authorize redistributing proprietary Sony firmware.
