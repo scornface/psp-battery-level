@@ -12,7 +12,7 @@ The percentage appears in the XMB and GAME HOME only, not over gameplay. POPS is
 
 **[Download the latest release ZIP](https://github.com/scornface/psp-battery-level/releases/latest/download/psp-battery-level.zip)** · [All releases and source archives](https://github.com/scornface/psp-battery-level/releases)
 
-The unified XMB/HOME build described here is not published yet. Build it from source using the instructions below; available downloads may support XMB only. Check the release notes for the package you download.
+Use **v0.10 or later** for unified XMB and GAME HOME support. Earlier releases support XMB only. POPS HOME is not supported.
 
 Release packages contain the ready-to-install `battery_level.prx`, this README and license notices. No development environment is needed to use a published package.
 
