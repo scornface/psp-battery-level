@@ -31,7 +31,7 @@ def clean_builds(all_outputs=False):
         directory = ROOT / "build" / mode
         paths = list(directory.glob("*.o")) + [directory / "exports.c"]
         if all_outputs:
-            paths += [directory / "battery_level.prx", directory / "battery_level.elf"]
+            paths += [directory / "battery_level.prx", directory / "battery_level.elf", directory / "vsh-payload.prx"]
         for path in paths:
             if path.is_file() and not path.is_symlink():
                 path.unlink()

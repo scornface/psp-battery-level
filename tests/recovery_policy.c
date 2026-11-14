@@ -1,5 +1,5 @@
 #include <assert.h>
-#include "../src/recovery_policy.h"
+#include "../src/vsh/recovery_policy.h"
 
 int main(void)
 {

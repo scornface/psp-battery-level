@@ -13,6 +13,7 @@ import common
 import build_rcomage
 import decompress_rco_rlz as rco
 import resolve_prx_rel2 as rel2
+import verify_assets
 
 
 class AnalysisBoundaries(unittest.TestCase):
@@ -46,6 +47,25 @@ class AnalysisBoundaries(unittest.TestCase):
     def test_nonzero_base_and_unknown_firmware_rejected(self):
         with self.assertRaises(ValueError): rel2.decode_prx(self.source, 0x08800000)
         with self.assertRaises(ValueError): rel2.decode_prx(self.source, 0)
+
+    def test_impose_scope_is_exact_and_unknown_input_never_parses(self):
+        self.assertEqual(common.FIRMWARE["impose_02g"],
+                         "4ad1f9c292eb88f7ea137ddb965c0a9ce7551251948f87e1b97534e5a2d542f0")
+        self.assertNotIn("impose_01g", common.FIRMWARE)
+        with patch.object(rel2.Prx, "parse", side_effect=AssertionError("unauthenticated ELF parsed")):
+            with self.assertRaises(ValueError):
+                rel2.decode_prx(self.source, 0)
+
+    def test_verification_rejects_unknown_assets_before_compiling(self):
+        font = self.directory / "F0/font/ltn8.pgf"
+        resource = self.directory / "F0/kd/resource/impose.rsc"
+        font.parent.mkdir(parents=True); resource.parent.mkdir(parents=True)
+        font.write_bytes(b"unknown font"); resource.write_bytes(b"unknown resource")
+        for tool in (verify_assets,):
+            with patch.object(tool, "external_directory", return_value=self.directory), \
+                    patch.object(tool.subprocess, "run", side_effect=AssertionError("compiler called")):
+                with self.assertRaisesRegex(ValueError, "Unrecorded Sony"):
+                    tool.main()
 
     def test_external_directory_requires_explicit_existing_absolute_input(self):
         for value in (None, "", " ", "relative/path", str(self.directory / "missing"), str(self.source), str(self.directory)):

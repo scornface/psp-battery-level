@@ -1,5 +1,5 @@
 #include <assert.h>
-#include "../src/update_policy.h"
+#include "../src/vsh/update_policy.h"
 
 int main(void)
 {

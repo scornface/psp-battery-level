@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT
  * Worker-only logger. Never dereferences native nodes or takes the PAF lock.
  * A fixed buffer, bounded ordinary snapshots and one write per entry avoid
- * per-field I/O; no file is touched while Sony's USB storage driver is started.
+ * per-field I/O. USB state queries suppress writes when storage is observed
+ * started; this is best-effort gating, not a filesystem/USB exclusion lock.
  */
 #include <pspkernel.h>
 #include <pspiofilemgr.h>

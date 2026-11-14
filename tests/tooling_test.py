@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from prx_libraries import Prx
-from check_build import check_module, nid
+from check_vsh import check_module, nid
 from summarize_log import parse_snapshots, completions
 
 

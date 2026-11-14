@@ -5,8 +5,8 @@
 #include <string.h>
 #define BATTERY_HOST_TEST 1
 #define BATTERY_DIAGNOSTICS 0
-#include "../src/native.c"
-#include "../src/xmb.c"
+#include "../src/vsh/native.c"
+#include "../src/vsh/xmb.c"
 
 volatile int stop_requested;
 static struct { U address; unsigned value; } memory[4096];

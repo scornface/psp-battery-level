@@ -5,6 +5,9 @@
 #ifndef BATTERY_DIAGNOSTICS_H
 #define BATTERY_DIAGNOSTICS_H
 #include "xmb.h"
+/* Single-worker API. Capture/begin copy a synchronized Status and do no I/O;
+ * poll/terminal emit only owned copies after the caller releases the PAF lock.
+ * terminal may wait/retry until stop_requested, so never call it in a callback. */
 #if BATTERY_DIAGNOSTICS
 void diagnostics_begin(const Status *s);
 void diagnostics_capture(const Status *s);

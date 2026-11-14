@@ -48,12 +48,15 @@ static int teardown_failed;
 static U retired_nodes[2];
 static volatile int requested_fault;
 static U auxiliary_nodes[4];
+
 Status status = {
     .desired = -1,
 #if BATTERY_DIAGNOSTICS
     .raw_percent = -1, .displayed = -1,
 #endif
 };
+
+/* Callback context, deferred faults and unload authorization. */
 
 /* This Plane flag controls DC recovery, but does NOT describe whether the
  * containing page is on screen. USB requires its own explicit lifecycle gate.
@@ -132,6 +135,9 @@ static int owned_text(U node)
     return user_address(sub, 0x20) && word(sub) == paf + 0x18c118
         && slot(sub, 0x78) == paf + 0x11a5c8 && user_address(word(sub + 0x1c), 0x1c0);
 }
+
+/* Native identities and expected geometry are separate checks: Sony may reset
+ * the clock legally, but replacing a parent/widget is never a layout reset. */
 static int bar_identity(void)
 {
     if (!context() || slot(parent, 0x4c) != paf + 0xec0c8 || slot(parent, 0x50) != paf + 0xec178
@@ -198,6 +204,8 @@ static U clock_event_slot(U function)
     }
     return item == head ? found : 0;
 }
+/* Native layout and cached visibility recovery. */
+
 static void native_reflow(float clock_x)
 {
     /* VSH+31038 consumes f12, positions clock and then measures its native box
@@ -341,6 +349,8 @@ static int set_percent(int percent)
     struct { uint16_t *data; unsigned length; } descriptor = {text, length};
     return ((int (*)(void *, const void *, unsigned))slot(new_node, 0xb4))((void *)new_node, &descriptor, 0);
 }
+/* Back-node preparation and measured front/back commit. */
+
 static int create_text(void)
 {
     /* Sony constructors still contain unchecked internal allocations. The free
@@ -375,6 +385,8 @@ static int metrics(U node, unsigned *width_out, float *box_out)
         || (word(backend + 0x144) & 0xffff) != 2) return 0;
     unsigned width = word(backend + 0x130);
     float box = from_bits(word(backend + 0x120));
+    /* Deliberately repeat the volatile readiness reads around the sample.
+     * A cached predicate would hide Sony's intervening backend publication. */
     if (word(backend + 0x188) || word(backend + 0x148) != 1
         || (word(backend + 0x144) & 0xffff) != 2
         || word(backend + 0x130) != width || word(backend + 0x120) != fbits(box)

@@ -52,6 +52,9 @@ extern Status status;
  * successful unload requires both the worker and the controller to be done.
  */
 extern volatile int stop_requested;
+/* Locking permits worker publication/snapshots, not native UI mutations.
+ * ready is a worker preflight; install requires the PAF lock and guards again.
+ * can_unload uses try-lock to reject active callbacks or ambiguous teardown. */
 int xmb_lock(void);
 void xmb_unlock(void);
 int xmb_ready(void);

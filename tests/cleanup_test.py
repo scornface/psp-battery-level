@@ -19,9 +19,9 @@ class CleanupTest(unittest.TestCase):
         for mode in ("release", "diagnostic"):
             directory = self.root / "build" / mode
             directory.mkdir(parents=True)
-            for name in ("main.o", "exports.c", "battery_level.prx", "battery_level.elf", "notes.txt"):
+            for name in ("main.o", "exports.c", "battery_level.prx", "battery_level.elf", "vsh-payload.prx", "notes.txt"):
                 (directory / name).write_bytes(b"fixture")
-        for directory, name in (("src", "main.c"), (".deps", "external.o"),
+        for directory, name in (("src/vsh", "main.c"), (".deps", "external.o"),
                                 ("data", "evidence.log"), ("build/custom", "custom.o")):
             path = self.root / directory
             path.mkdir(parents=True, exist_ok=True)
@@ -32,14 +32,14 @@ class CleanupTest(unittest.TestCase):
         self.temporary.cleanup()
 
     def assert_preserved(self):
-        for relative in ("src/main.c", ".deps/external.o", "data/evidence.log", "build/custom/custom.o"):
+        for relative in ("src/vsh/main.c", ".deps/external.o", "data/evidence.log", "build/custom/custom.o"):
             self.assertEqual((self.root / relative).read_bytes(), b"preserve")
 
     def test_default_preserves_outputs_and_unrelated_files(self):
         clean.clean_builds()
         for mode in ("release", "diagnostic"):
             self.assertEqual({p.name for p in (self.root / "build" / mode).iterdir()},
-                             {"battery_level.prx", "battery_level.elf", "notes.txt"})
+                             {"battery_level.prx", "battery_level.elf", "vsh-payload.prx", "notes.txt"})
         self.assert_preserved()
 
     def test_all_is_scoped_and_idempotent(self):
@@ -65,7 +65,7 @@ class CleanupTest(unittest.TestCase):
         (self.root / "build").symlink_to(self.root / "src", target_is_directory=True)
         with self.assertRaises(ValueError):
             clean.clean_builds(True)
-        for relative in ("src/main.c", ".deps/external.o", "data/evidence.log"):
+        for relative in ("src/vsh/main.c", ".deps/external.o", "data/evidence.log"):
             self.assertEqual((self.root / relative).read_bytes(), b"preserve")
 
     def test_file_symlink_is_not_followed(self):

@@ -1,5 +1,5 @@
 #include <assert.h>
-#include "../src/layout_policy.h"
+#include "../src/vsh/layout_policy.h"
 
 int main(void)
 {

@@ -12,6 +12,8 @@ typedef struct {
     int paf_query, vsh_query;
     unsigned paf_base, vsh_base, paf_size, vsh_size, checks;
 } NativeDiscovery;
+/* Worker discovery publishes paf/vsh only after every descriptor/range check.
+ * info is optional and receives diagnostic results even on discovery failure. */
 int native_discover(NativeDiscovery *info);
 int user_address(U p, unsigned size);
 extern int paf_float_bits(U target, U node, unsigned id, unsigned bits);
@@ -28,6 +30,8 @@ static inline void write_word(U p, unsigned value) { *(volatile unsigned *)p = v
 static inline U slot(U n, unsigned offset) { return word(word(n) + offset); }
 static inline unsigned fbits(float f) { union { float f; unsigned b; } u = {.f = f}; return u.b; }
 static inline float from_bits(unsigned b) { union { float f; unsigned b; } u = {.b = b}; return u.f; }
+/* Callers validate object identity/ownership before these thin ABI adapters.
+ * destroy_text invokes Sony's complete destructor/free; never free it again. */
 void position(U n, const float v[4]);
 void visibility(U n, int visible);
 int style(U n);

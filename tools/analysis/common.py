@@ -13,13 +13,15 @@ FIRMWARE = {
     "paf": "699413b667199732af0b3cc2379ea65df0c4e2daa7727c6d1bbb757df0160417",
     "vshmain": "dd283103f78db14a8bd08c8aa03ecc01807850baed54fb77b3c38ba7ffff712f",
     "dialogmain": "c3602b6c63f559318af51390bff21babbd68371cf505e6dffa20ad670ee86578",
+    "impose_02g": "4ad1f9c292eb88f7ea137ddb965c0a9ce7551251948f87e1b97534e5a2d542f0",
+    "display_02g": "8e0a42ad82095e61c2e67bb68d140dd8f64c003c8172749cb98bc7eee5cf2b9a",
 }
 
 
 def verified_source(path):
     data = bounded_read(path, 32 * 1024 * 1024)
     if hashlib.sha256(data).hexdigest() not in FIRMWARE.values():
-        raise ValueError("Only the three verified Sony 6.61 analysis modules are supported")
+        raise ValueError("Only the recorded verified Sony 6.61 analysis modules are supported")
     return data
 
 
